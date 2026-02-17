@@ -3,16 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 增强浏览版</title>
+    <title>校园生活助手 - 增强版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; }
+        :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'PingFang SC', sans-serif; }
         body { background: var(--bg); color: var(--text); padding-bottom: 50px; }
         
-        header { background: #fff; padding: 1rem 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 1000; }
-        .logo { font-size: 1.4rem; font-weight: 800; color: var(--primary); cursor: pointer; }
-        nav { display: flex; gap: 10px; }
+        /* 导航与搜索 */
+        header { background: #fff; padding: 1rem 3%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 1000; flex-wrap: wrap; gap: 10px; }
+        .nav-group { display: flex; align-items: center; gap: 15px; }
+        .search-box { position: relative; flex-grow: 1; max-width: 300px; }
+        .search-box input { width: 100%; padding: 8px 35px 8px 15px; border-radius: 20px; border: 1px solid #ddd; outline: none; font-size: 0.9rem; }
+        .search-icon { position: absolute; right: 12px; top: 8px; color: #999; }
+        
+        nav { display: flex; gap: 5px; }
         .nav-link { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; color: #666; transition: 0.3s; font-size: 0.9rem; }
         .nav-link.active { background: var(--primary); color: white; }
         
@@ -23,48 +28,58 @@
         .content-section { display: none; }
         .content-section.active { display: block; }
         
-        /* 列表卡片样式 */
+        /* 卡片 */
         .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
         .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s; position: relative; }
         .card:hover { transform: translateY(-3px); }
         .card-img { width: 100%; height: 180px; object-fit: cover; background: #eee; }
         .card-body { padding: 12px; }
-        .price { color: #ef4444; font-size: 1.1rem; font-weight: 800; }
-        .badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; }
+        .price { color: var(--danger); font-size: 1.1rem; font-weight: 800; }
 
-        /* 模态框通用样式 */
+        /* 弹窗 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .modal.open { display: flex; }
-        .modal-content { background: white; width: 95%; max-width: 500px; padding: 20px; border-radius: 16px; max-height: 85vh; overflow-y: auto; position: relative; }
-        
-        /* 详情页专用样式 */
-        .detail-gallery { display: flex; overflow-x: auto; gap: 10px; margin-bottom: 15px; scroll-snap-type: x mandatory; }
-        .detail-gallery img { width: 80%; flex-shrink: 0; border-radius: 8px; scroll-snap-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .detail-info h2 { margin-bottom: 10px; color: var(--primary); }
-        .detail-item { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed #eee; }
-        .detail-label { color: #888; font-size: 0.8rem; }
-        .qr-section { background: #f0fdf4; padding: 10px; border-radius: 8px; text-align: center; margin-top: 15px; }
-        .qr-img { width: 150px; height: 150px; margin-top: 5px; border: 2px solid var(--secondary); }
+        .modal-content { background: white; width: 95%; max-width: 500px; padding: 25px; border-radius: 16px; max-height: 85vh; overflow-y: auto; position: relative; }
+        .close-btn { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 50%; }
 
-        /* 发布页图片预览 */
-        .preview-grid { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        /* 图片浏览增强 */
+        .detail-gallery { display: flex; overflow-x: auto; gap: 10px; margin: 15px 0; scroll-snap-type: x mandatory; padding-bottom: 5px; }
+        .detail-gallery img { width: 100px; height: 100px; object-fit: cover; flex-shrink: 0; border-radius: 8px; cursor: zoom-in; }
+        
+        /* 全屏图片预览层 */
+        #imgViewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; }
+        #imgViewer img { max-width: 95%; max-height: 95%; object-fit: contain; }
+
+        /* 删除按钮 */
+        .del-btn { background: #fee2e2; color: var(--danger); border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-top: 20px; width: 100%; font-weight: bold; }
+        
+        /* 表单控件 */
+        input, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        label { font-size: 0.85rem; color: #666; font-weight: bold; }
+
+        .preview-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
         .preview-item { position: relative; width: 60px; height: 60px; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-        .remove-btn { position: absolute; top: -5px; right: -5px; background: red; color: white; width: 18px; height: 18px; border-radius: 50%; font-size: 12px; text-align: center; line-height: 18px; cursor: pointer; }
-
-        .close-modal { position: absolute; top: 10px; right: 15px; font-size: 24px; color: #999; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo" onclick="location.reload()">🏫 校园助手</div>
-        <nav>
-            <div class="nav-link active" id="nav-market" onclick="switchSection('market')">二手</div>
-            <div class="nav-link" id="nav-carpool" onclick="switchSection('carpool')">拼车</div>
-            <div class="nav-link" id="nav-jobs" onclick="switchSection('jobs')">兼职</div>
-        </nav>
-        <button id="loginBtn" onclick="doLogin()" style="font-size: 0.8rem; border: none; background: #eee; padding: 5px 10px; border-radius: 15px;">用户连接</button>
+        <div class="nav-group">
+            <div class="logo" onclick="location.reload()">🏫 校园助手</div>
+            <nav>
+                <div class="nav-link active" id="nav-market" onclick="switchSection('market')">二手</div>
+                <div class="nav-link" id="nav-carpool" onclick="switchSection('carpool')">拼车</div>
+                <div class="nav-link" id="nav-jobs" onclick="switchSection('jobs')">兼职</div>
+            </nav>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="搜索商品名称/路线/岗位..." oninput="handleSearch()">
+            <span class="search-icon">🔍</span>
+        </div>
+        
+        <button id="loginBtn" onclick="doLogin()" style="border:none; background:#eee; padding:6px 12px; border-radius:15px; font-size:12px; cursor:pointer;">建立云连接</button>
     </header>
 
     <main>
@@ -84,187 +99,226 @@
         </section>
     </main>
 
+    <div id="imgViewer" onclick="this.style.display='none'">
+        <img id="viewedImg" src="">
+    </div>
+
     <div id="detailModal" class="modal">
         <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">×</span>
-            <div id="detailContent">
-                </div>
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <div id="detailContent"></div>
         </div>
     </div>
 
     <div id="pubMarket" class="modal">
         <div class="modal-content">
+            <div class="close-btn" onclick="closeModal()">×</div>
             <h3>发布二手商品</h3>
-            <input type="text" id="m_t" placeholder="商品名称" style="margin-top:10px">
-            <input type="number" id="m_p" placeholder="价格 (¥)" style="margin:10px 0">
-            <input type="text" id="m_c" placeholder="微信号/手机号">
-            <div style="margin-top:10px"><label>实物图：</label><input type="file" multiple onchange="handleImgs(this, 'pre_m', 'store_m')"></div>
+            <input type="text" id="m_t" placeholder="商品名称（搜索关键词）">
+            <input type="number" id="m_p" placeholder="价格 (¥)">
+            <input type="text" id="m_c" placeholder="联系微信号">
+            <label>实物图：</label><input type="file" multiple onchange="handleImgs(this, 'pre_m', 'store_m')">
             <div class="preview-grid" id="pre_m"></div>
-            <div style="margin-top:10px"><label>收款码(可选)：</label><input type="file" onchange="handleImgs(this, 'pre_q', 'store_q')"></div>
+            <label>收款码(可选)：</label><input type="file" onchange="handleImgs(this, 'pre_q', 'store_q')">
             <div class="preview-grid" id="pre_q"></div>
-            <button class="btn-main" style="width:100%; margin-top:15px" onclick="submit('Market')">确认同步云端</button>
+            <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button>
         </div>
     </div>
 
     <div id="pubCarpool" class="modal">
         <div class="modal-content">
+            <div class="close-btn" onclick="closeModal()">×</div>
             <h3>发布拼车行程</h3>
-            <input type="text" id="c_t" placeholder="路线：例如 宿舍-高铁站" style="margin-top:10px">
-            <input type="text" id="c_time" placeholder="出发时间" style="margin:10px 0">
+            <input type="text" id="c_t" placeholder="出发地 - 目的地">
+            <input type="text" id="c_time" placeholder="出发时间">
             <input type="text" id="c_c" placeholder="联系方式">
-            <div style="margin-top:10px"><label>行程图：</label><input type="file" multiple onchange="handleImgs(this, 'pre_c', 'store_c')"></div>
+            <label>相关图片：</label><input type="file" multiple onchange="handleImgs(this, 'pre_c', 'store_c')">
             <div class="preview-grid" id="pre_c"></div>
-            <button class="btn-main" style="width:100%; margin-top:15px" onclick="submit('Carpool')">确认同步云端</button>
+            <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Carpool')">确认发布</button>
         </div>
     </div>
 
     <div id="pubJob" class="modal">
         <div class="modal-content">
-            <h3>发布兼职岗位</h3>
-            <input type="text" id="j_t" placeholder="岗位名称" style="margin-top:10px">
-            <input type="text" id="j_p" placeholder="薪资详情" style="margin:10px 0">
-            <textarea id="j_d" placeholder="要求与职责" style="width:100%; padding:8px; border-radius:8px; border:1px solid #ddd;"></textarea>
-            <input type="text" id="j_c" placeholder="联系方式" style="margin-top:10px">
-            <div style="margin-top:10px"><label>海报图：</label><input type="file" multiple onchange="handleImgs(this, 'pre_j', 'store_j')"></div>
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <h3>发布兼职招聘</h3>
+            <input type="text" id="j_t" placeholder="岗位名称">
+            <input type="text" id="j_p" placeholder="薪资/待遇">
+            <textarea id="j_d" placeholder="详细要求" rows="3"></textarea>
+            <input type="text" id="j_c" placeholder="联系方式">
+            <label>海报/环境图：</label><input type="file" multiple onchange="handleImgs(this, 'pre_j', 'store_j')">
             <div class="preview-grid" id="pre_j"></div>
-            <button class="btn-main" style="width:100%; margin-top:15px" onclick="submit('Job')">确认同步云端</button>
+            <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Job')">确认发布</button>
         </div>
     </div>
 
     <script>
-        // --- 初始化 ---
         const SUPABASE_URL = 'https://xhcqqnpzyafvjsxyndya.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_gsBzkYayDH3Z3jbEENOLrA__a7tf2TA';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let isLogin = false;
-        let files = { store_m: [], store_q: [], store_c: [], store_j: [] };
+        let globalData = { Market: [], Carpool: [], Job: [] };
+        let localFiles = { store_m: [], store_q: [], store_c: [], store_j: [] };
 
-        // --- 核心功能：浏览详情 ---
+        // --- 搜索功能 ---
+        function handleSearch() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const currentTab = document.querySelector('.nav-link.active').id.split('-')[1];
+            const tabMap = { market: 'Market', carpool: 'Carpool', jobs: 'Job' };
+            const listId = currentTab + 'List';
+            
+            const filtered = globalData[tabMap[currentTab]].filter(item => {
+                const title = (item.name || item.route || item.title || "").toLowerCase();
+                return title.includes(keyword);
+            });
+            render(listId, filtered, tabMap[currentTab]);
+        }
+
+        // --- 图片浏览功能 ---
+        function viewImage(url) {
+            document.getElementById('viewedImg').src = url;
+            document.getElementById('imgViewer').style.display = 'flex';
+        }
+
+        // --- 详情与删除逻辑 ---
         function showDetail(item, type) {
             const content = document.getElementById('detailContent');
-            let imagesHtml = (item.images || []).map(src => `<img src="${src}" onclick="window.open('${src}')">`).join('');
-            
+            const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
+            const isMyPost = myPosts.includes(item.id);
+
             let html = `
-                <div class="detail-gallery">${imagesHtml}</div>
-                <div class="detail-info">
-                    <h2>${item.name || item.route || item.title}</h2>
-                    ${item.price ? `<div class="detail-item"><span class="detail-label">价格：</span><span class="price">¥${item.price}</span></div>` : ''}
-                    ${item.time ? `<div class="detail-item"><span class="detail-label">出发时间：</span><span>${item.time}</span></div>` : ''}
-                    ${item.pay ? `<div class="detail-item"><span class="detail-label">薪资：</span><span style="color:green;font-weight:bold">${item.pay}</span></div>` : ''}
-                    <div class="detail-item"><span class="detail-label">发布时间：</span><span>${new Date(item.created_at).toLocaleString()}</span></div>
-                    <div class="detail-item" style="background:#f9f9f9; padding:10px; border-radius:8px;">
-                        <span class="detail-label">联系方式：</span><br>
-                        <strong style="font-size:1.1rem">${item.contact}</strong>
-                    </div>
-                    ${item.qr ? `
-                        <div class="qr-section">
-                            <span class="detail-label">扫码支付/加好友：</span><br>
-                            <img src="${item.qr}" class="qr-img">
-                        </div>
-                    ` : ''}
+                <div class="detail-gallery">
+                    ${(item.images || []).map(u => `<img src="${u}" onclick="viewImage('${u}')" title="点击放大">`).join('')}
                 </div>
-                <p style="text-align:center; color:#ccc; font-size:12px; margin-top:15px;">点击大图可查看原图</p>
+                <div style="padding:10px 0">
+                    <h2 style="color:var(--primary)">${item.name || item.route || item.title}</h2>
+                    <p style="margin:10px 0"><b>详情/联系：</b>${item.contact}</p>
+                    ${item.price ? `<p class="price">¥${item.price}</p>` : ''}
+                    ${item.time ? `<p>⏰ 时间：${item.time}</p>` : ''}
+                    ${item.pay ? `<p>💰 薪资：${item.pay}</p>` : ''}
+                    ${item.desc ? `<p style="color:#666; font-size:0.9rem; margin-top:10px">${item.desc}</p>` : ''}
+                    ${item.qr ? `<div style="text-align:center; margin-top:15px; background:#f0fdf4; padding:10px; border-radius:10px;">
+                        <p style="font-size:12px; color:var(--secondary)">长按扫码或点击放大</p>
+                        <img src="${item.qr}" style="width:150px; cursor:pointer" onclick="viewImage('${this.src}')">
+                    </div>` : ''}
+                </div>
+                ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除我发布的这条内容</button>` : ''}
             `;
             content.innerHTML = html;
             openModal('detailModal');
         }
 
-        // --- 图片处理 ---
-        function handleImgs(input, preId, key) {
-            const selected = Array.from(input.files);
-            selected.forEach(file => {
-                files[key].push(file);
-                const reader = new FileReader();
-                reader.onload = e => {
-                    const div = document.createElement('div');
-                    div.className = 'preview-item';
-                    div.innerHTML = `<img src="${e.target.result}"><div class="remove-btn" onclick="this.parentElement.remove()">×</div>`;
-                    document.getElementById(preId).appendChild(div);
-                };
-                reader.readAsDataURL(file);
-            });
+        async function deletePost(id, type) {
+            if(!confirm("确定要永久删除这条发布吗？")) return;
+            try {
+                const { error } = await _supabase.from(type).delete().eq('id', id);
+                if(error) throw error;
+                alert("已成功删除");
+                location.reload();
+            } catch (e) { alert("删除失败: " + e.message); }
         }
 
-        // --- 提交数据 ---
+        // --- 核心上传逻辑 ---
         async function submit(type) {
-            if(!isLogin) return alert("请先点击'用户连接'按钮");
+            if(!isLogin) return alert("请先连接云端");
             const btn = event.target;
-            btn.innerText = "同步中..."; btn.disabled = true;
+            btn.innerText = "处理中..."; btn.disabled = true;
 
             try {
                 let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
                 const imgUrls = [];
-                for(let f of files[key]) {
-                    const name = `${Date.now()}_${f.name}`;
-                    await _supabase.storage.from('images').upload(name, f);
-                    imgUrls.push(_supabase.storage.from('images').getPublicUrl(name).data.publicUrl);
+                for(let f of localFiles[key]) {
+                    const fname = `${Date.now()}_${f.name}`;
+                    await _supabase.storage.from('images').upload(fname, f);
+                    imgUrls.push(_supabase.storage.from('images').getPublicUrl(fname).data.publicUrl);
                 }
 
                 let qrUrl = "";
-                if(type === 'Market' && files.store_q.length > 0) {
-                    const name = `QR_${Date.now()}.png`;
-                    await _supabase.storage.from('images').upload(name, files.store_q[0]);
-                    qrUrl = _supabase.storage.from('images').getPublicUrl(name).data.publicUrl;
+                if(type === 'Market' && localFiles.store_q.length > 0) {
+                    const qname = `QR_${Date.now()}.png`;
+                    await _supabase.storage.from('images').upload(qname, localFiles.store_q[0]);
+                    qrUrl = _supabase.storage.from('images').getPublicUrl(qname).data.publicUrl;
                 }
 
-                let data = { images: imgUrls };
+                const payload = { 
+                    images: imgUrls, 
+                    contact: document.getElementById(type[0].toLowerCase()+'_c').value 
+                };
                 if(type === 'Market') {
-                    data.name = document.getElementById('m_t').value;
-                    data.price = document.getElementById('m_p').value;
-                    data.contact = document.getElementById('m_c').value;
-                    data.qr = qrUrl;
+                    payload.name = document.getElementById('m_t').value;
+                    payload.price = document.getElementById('m_p').value;
+                    payload.qr = qrUrl;
                 } else if(type === 'Carpool') {
-                    data.route = document.getElementById('c_t').value;
-                    data.time = document.getElementById('c_time').value;
-                    data.contact = document.getElementById('c_c').value;
+                    payload.route = document.getElementById('c_t').value;
+                    payload.time = document.getElementById('c_time').value;
                 } else if(type === 'Job') {
-                    data.title = document.getElementById('j_t').value;
-                    data.pay = document.getElementById('j_p').value;
-                    data.contact = document.getElementById('j_c').value;
+                    payload.title = document.getElementById('j_t').value;
+                    payload.pay = document.getElementById('j_p').value;
+                    payload.desc = document.getElementById('j_d').value;
                 }
 
-                await _supabase.from(type).insert([data]);
-                alert("云端同步成功！");
+                const { data, error } = await _supabase.from(type).insert([payload]).select();
+                if(error) throw error;
+
+                // 记录发布 ID 到本地，用于后续删除识别
+                const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
+                myPosts.push(data[0].id);
+                localStorage.setItem('my_posts', JSON.stringify(myPosts));
+
+                alert("发布成功！");
                 location.reload();
-            } catch (e) { alert("失败:" + e.message); btn.disabled = false; btn.innerText = "确认同步云端"; }
+            } catch (e) { alert("错误: " + e.message); btn.disabled = false; btn.innerText = "确认发布"; }
         }
 
-        // --- 加载数据并渲染 ---
+        // --- 通用工具 ---
+        function handleImgs(input, preId, key) {
+            Array.from(input.files).forEach(f => {
+                localFiles[key].push(f);
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `<img src="${e.target.result}"><div style="position:absolute;top:-5px;right:-5px;background:red;color:white;width:15px;height:15px;border-radius:50%;font-size:10px;text-align:center;cursor:pointer" onclick="this.parentElement.remove()">×</div>`;
+                    document.getElementById(preId).appendChild(div);
+                };
+                reader.readAsDataURL(f);
+            });
+        }
+
         async function load() {
-            const m = await _supabase.from('Market').select('*').order('created_at', {ascending:false});
-            render('marketList', m.data, 'Market');
-            const c = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
-            render('carpoolList', c.data, 'Carpool');
-            const j = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
-            render('jobsList', j.data, 'Job');
+            const { data: m } = await _supabase.from('Market').select('*').order('created_at', {ascending:false});
+            const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
+            const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
+            globalData = { Market: m||[], Carpool: c||[], Job: j||[] };
+            render('marketList', globalData.Market, 'Market');
+            render('carpoolList', globalData.Carpool, 'Carpool');
+            render('jobsList', globalData.Job, 'Job');
         }
 
         function render(id, list, type) {
             const container = document.getElementById(id);
-            if(!list) return;
             container.innerHTML = list.map(item => `
                 <div class="card" onclick='showDetail(${JSON.stringify(item)}, "${type}")'>
                     <img src="${item.images[0] || ''}" class="card-img">
-                    ${item.images.length > 1 ? `<span class="badge">共 ${item.images.length} 张</span>` : ''}
                     <div class="card-body">
-                        ${type === 'Market' ? `<div class="price">¥${item.price}</div><h4>${item.name}</h4>` : ''}
-                        ${type === 'Carpool' ? `<h4>${item.route}</h4><p style="font-size:12px;color:#888">${item.time}</p>` : ''}
-                        ${type === 'Job' ? `<div style="color:green;font-weight:bold">${item.pay}</div><h4>${item.title}</h4>` : ''}
+                        ${type==='Market' ? `<div class="price">¥${item.price}</div><h4>${item.name}</h4>` : ''}
+                        ${type==='Carpool' ? `<h4>${item.route}</h4><p style="font-size:12px;color:#888">${item.time}</p>` : ''}
+                        ${type==='Job' ? `<div style="color:var(--secondary);font-weight:bold">${item.pay}</div><h4>${item.title}</h4>` : ''}
                     </div>
                 </div>
             `).join('');
         }
 
-        // --- 基础逻辑 ---
         function switchSection(id) {
             document.querySelectorAll('.content-section, .nav-link').forEach(el => el.classList.remove('active'));
             document.getElementById(id + 'Section').classList.add('active');
             document.getElementById('nav-' + id).classList.add('active');
+            handleSearch(); // 切换时保留搜索筛选
         }
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
-        function doLogin() { isLogin = true; document.getElementById('loginBtn').innerText = "✅ 云端已连接"; alert("已建立加密云连接"); }
+        function doLogin() { isLogin = true; document.getElementById('loginBtn').innerText = "✅ 云连接已建立"; alert("已接入校园云数据库"); }
 
         window.onload = load;
     </script>
