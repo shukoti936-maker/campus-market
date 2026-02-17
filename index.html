@@ -3,120 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活全能助手</title>
+    <title>校园生活全能助手 - 终极云端版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* 这里保留你原来的 CSS 样式，我为你精简了核心展示部分 */
-        :root { --primary: #4f46e5; --bg: #f9fafb; }
-        body { background: var(--bg); font-family: 'PingFang SC', sans-serif; padding: 15px; }
-        .card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .price { color: #ff4d4f; font-size: 1.2rem; font-weight: bold; }
-        .img-container { display: flex; gap: 10px; overflow-x: auto; margin: 10px 0; }
-        .img-container img { height: 120px; border-radius: 8px; border: 1px solid #eee; }
-        .input-group { margin-bottom: 10px; }
-        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .btn { background: var(--primary); color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f9fafb; --text: #1f2937; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'PingFang SC', sans-serif; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 50px; }
+        
+        /* 导航头 */
+        header { background: #fff; padding: 1rem 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 1000; }
+        .logo { font-size: 1.4rem; font-weight: 800; color: var(--primary); cursor: pointer; }
+        nav { display: flex; gap: 15px; }
+        .nav-link { padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; color: #666; transition: 0.3s; }
+        .nav-link.active { background: var(--primary); color: white; }
+        
+        /* 主体布局 */
+        main { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        /* 内容显隐 */
+        .content-section { display: none; }
+        .content-section.active { display: block; animation: fadeIn 0.4s; }
+        
+        /* 卡片列表 */
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: relative; }
+        .gallery { display: flex; overflow-x: auto; height: 200px; background: #f0f0f0; scroll-snap-type: x mandatory; }
+        .gallery img { flex: 0 0 100%; width: 100%; object-fit: cover; scroll-snap-align: start; }
+        .pay-badge { position: absolute; top: 10px; right: 10px; background: var(--secondary); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; z-index: 10; }
+        .card-body { padding: 15px; }
+        .price { color: #ef4444; font-size: 1.2rem; font-weight: 800; }
+
+        /* 弹窗与预览 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal.open { display: flex; }
+        .modal-content { background: white; width: 90%; max-width: 500px; padding: 25px; border-radius: 16px; max-height: 90vh; overflow-y: auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        
+        /* 图片预览区 */
+        .preview-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .preview-item { position: relative; width: 70px; height: 70px; border: 1px solid #eee; border-radius: 6px; }
+        .preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+        .remove-btn { position: absolute; top: -8px; right: -8px; background: #ff4d4f; color: white; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; cursor: pointer; text-align: center; line-height: 16px; font-weight: bold; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-    <header style="text-align:center; margin-bottom:20px;">
-        <h2>🏫 校园生活助手</h2>
-        <p id="status" style="color: #666; font-size: 0.9rem;">正在连接云端...</p>
+    <header>
+        <div class="logo" onclick="switchSection('market')">🏫 校园生活</div>
+        <nav>
+            <div class="nav-link active" id="nav-market" onclick="switchSection('market')">二手集市</div>
+            <div class="nav-link" id="nav-carpool" onclick="switchSection('carpool')">拼车出行</div>
+            <div class="nav-link" id="nav-jobs" onclick="switchSection('jobs')">兼职广场</div>
+        </nav>
+        <button id="loginBtn" onclick="doLogin()" style="padding: 6px 15px; border-radius: 20px; border: 1px solid #ddd; cursor: pointer;">用户登录</button>
     </header>
 
-    <div class="card">
-        <h3>发布闲置 / 需求</h3>
-        <div class="input-group"><input type="text" id="m_name" placeholder="商品或标题名称"></div>
-        <div class="input-group"><input type="number" id="m_price" placeholder="金额 (¥)"></div>
-        <div class="input-group"><input type="text" id="m_contact" placeholder="联系方式 (微信/QQ)"></div>
-        <div class="input-group"><input type="file" id="m_files" multiple accept="image/*"></div>
-        <button class="btn" onclick="publish()">确认发布到云数据库</button>
+    <main>
+        <section id="marketSection" class="content-section active">
+            <div class="section-header"><h2>二手闲置</h2><button class="btn-main" onclick="openModal('marketModal')">+ 发布宝贝</button></div>
+            <div class="data-grid" id="marketList"></div>
+        </section>
+
+        <section id="carpoolSection" class="content-section">
+            <div class="section-header"><h2>拼车行程</h2><button class="btn-main" onclick="openModal('carpoolModal')">+ 发布行程</button></div>
+            <div class="data-grid" id="carpoolList"></div>
+        </section>
+
+        <section id="jobsSection" class="content-section">
+            <div class="section-header"><h2>兼职招聘</h2><button class="btn-main" onclick="openModal('jobsModal')">+ 发布兼职</button></div>
+            <div class="data-grid" id="jobsList"></div>
+        </section>
+    </main>
+
+    <div id="marketModal" class="modal">
+        <div class="modal-content">
+            <h3>发布二手宝贝</h3>
+            <div class="form-group"><label>商品名称</label><input type="text" id="m_title"></div>
+            <div class="form-group"><label>价格 (¥)</label><input type="number" id="m_price"></div>
+            <div class="form-group"><label>联系方式</label><input type="text" id="m_contact"></div>
+            <div class="form-group">
+                <label>实物图 (多张)</label>
+                <input type="file" id="m_imgs" multiple accept="image/*" onchange="previewImages(this, 'm_pre', 'm_files')">
+                <div class="preview-grid" id="m_pre"></div>
+            </div>
+            <div class="form-group">
+                <label style="color:var(--secondary)">上传收款码 (可选)</label>
+                <input type="file" id="m_qr" accept="image/*" onchange="previewImages(this, 'mq_pre', 'mq_files')">
+                <div class="preview-grid" id="mq_pre"></div>
+            </div>
+            <button class="btn-main" style="width:100%" onclick="submitForm('Market')">确认发布</button>
+            <button onclick="closeModal()" style="width:100%; margin-top:10px; background:none; border:none; color:#999; cursor:pointer;">取消</button>
+        </div>
     </div>
 
-    <div id="list-container"></div>
+    <div id="carpoolModal" class="modal">
+        <div class="modal-content">
+            <h3>发布拼车行程</h3>
+            <div class="form-group"><label>行程路线</label><input type="text" id="c_title"></div>
+            <div class="form-group"><label>出发时间</label><input type="datetime-local" id="c_time"></div>
+            <div class="form-group"><label>价格/联系</label><input type="text" id="c_contact"></div>
+            <div class="form-group">
+                <label>图片</label>
+                <input type="file" id="c_imgs" multiple accept="image/*" onchange="previewImages(this, 'c_pre', 'c_files')">
+                <div class="preview-grid" id="c_pre"></div>
+            </div>
+            <button class="btn-main" style="width:100%" onclick="submitForm('Carpool')">确认发布</button>
+            <button onclick="closeModal()" style="width:100%; margin-top:10px; border:none; color:#999; cursor:pointer;">取消</button>
+        </div>
+    </div>
+
+    <div id="jobsModal" class="modal">
+        <div class="modal-content">
+            <h3>发布兼职招聘</h3>
+            <div class="form-group"><label>招聘岗位</label><input type="text" id="j_title"></div>
+            <div class="form-group"><label>薪资待遇</label><input type="text" id="j_pay"></div>
+            <div class="form-group"><label>工作要求/联系</label><textarea id="j_contact" rows="3"></textarea></div>
+            <div class="form-group">
+                <label>海报</label>
+                <input type="file" id="j_imgs" multiple accept="image/*" onchange="previewImages(this, 'j_pre', 'j_files')">
+                <div class="preview-grid" id="j_pre"></div>
+            </div>
+            <button class="btn-main" style="width:100%" onclick="submitForm('Job')">确认发布</button>
+            <button onclick="closeModal()" style="width:100%; margin-top:10px; border:none; color:#999; cursor:pointer;">取消</button>
+        </div>
+    </div>
 
     <script>
-        // --- 1. 初始化你的 Supabase (已填入你截图中的 Key) ---
+        // --- 1. 初始化 Supabase ---
         const SUPABASE_URL = 'https://xhcqqnpzyafvjsxyndya.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_gsBzkYayDH3Z3jbEENOLrA__a7tf2TA';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 检查连接
-        window.onload = () => {
-            document.getElementById('status').innerText = "✅ 云端已连接 (Supabase)";
-            fetchData();
-        };
+        let isLogin = false;
+        let fileStores = { m_files: [], mq_files: [], c_files: [], j_files: [] };
 
-        // --- 2. 发布逻辑 (替换掉原来的 AV.Object) ---
-        async function publish() {
-            const name = document.getElementById('m_name').value;
-            const price = document.getElementById('m_price').value;
-            const contact = document.getElementById('m_contact').value;
-            const fileInput = document.getElementById('m_files');
+        // --- 2. 图片预览与多选逻辑 ---
+        function previewImages(input, preId, storeKey) {
+            const files = Array.from(input.files);
+            files.forEach(file => {
+                fileStores[storeKey].push(file);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `<img src="${e.target.result}"><div class="remove-btn" onclick="removeImg('${storeKey}', ${fileStores[storeKey].length-1}, '${preId}')">×</div>`;
+                    document.getElementById(preId).appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+            input.value = ""; // 清空input以便重复选
+        }
 
-            if (!name || fileInput.files.length === 0) {
-                return alert("请至少填写名称并上传一张图片！");
-            }
+        function removeImg(storeKey, index, preId) {
+            fileStores[storeKey].splice(index, 1);
+            const box = document.getElementById(preId);
+            box.innerHTML = ""; // 重新渲染预览
+            fileStores[storeKey].forEach((file, i) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    div.innerHTML = `<img src="${e.target.result}"><div class="remove-btn" onclick="removeImg('${storeKey}', ${i}, '${preId}')">×</div>`;
+                    box.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
 
-            const btn = document.querySelector('.btn');
-            btn.innerText = "正在同步云端...";
+        // --- 3. 登录与发布 ---
+        function doLogin() { isLogin = true; document.getElementById('loginBtn').innerText = "✅ 已登录"; alert("连接校园云数据库成功！"); }
+
+        async function submitForm(type) {
+            if(!isLogin) return alert("请先点击上方'用户登录'！");
+            
+            let btn = event.target;
+            btn.innerText = "上传中...";
             btn.disabled = true;
 
             try {
-                // 上传图片到 IMAGES 存储桶
-                const imageUrls = [];
-                for (let file of fileInput.files) {
-                    const fileName = `${Date.now()}_${file.name}`;
-                    const { data, error } = await _supabase.storage
-                        .from('IMAGES') // 注意：这里必须和 Supabase 后台桶名一致
-                        .upload(fileName, file);
-                    
-                    if (error) throw error;
-
-                    const { data: { publicUrl } } = _supabase.storage.from('IMAGES').getPublicUrl(fileName);
-                    imageUrls.push(publicUrl);
+                // 根据类型获取对应的文件库
+                let storeKey = type === 'Market' ? 'm_files' : (type === 'Carpool' ? 'c_files' : 'j_files');
+                let urls = [];
+                for(let f of fileStores[storeKey]) {
+                    const fName = `${Date.now()}_${f.name}`;
+                    const { data, error } = await _supabase.storage.from('images').upload(fName, f);
+                    if(error) throw error;
+                    const { data: { publicUrl } } = _supabase.storage.from('images').getPublicUrl(fName);
+                    urls.push(publicUrl);
                 }
 
-                // 写入数据库表 Market
-                const { error: dbError } = await _supabase
-                    .from('Market')
-                    .insert([{ name, price: parseFloat(price), contact, images: imageUrls }]);
+                // 收款码专用上传
+                let qrUrl = "";
+                if(type === 'Market' && fileStores.mq_files.length > 0) {
+                    const fName = `QR_${Date.now()}_qr.png`;
+                    await _supabase.storage.from('images').upload(fName, fileStores.mq_files[0]);
+                    qrUrl = _supabase.storage.from('images').getPublicUrl(fName).data.publicUrl;
+                }
 
-                if (dbError) throw dbError;
+                // 组装数据并存入数据库
+                let payload = { images: urls };
+                if(type === 'Market') {
+                    payload.name = document.getElementById('m_title').value;
+                    payload.price = document.getElementById('m_price').value;
+                    payload.contact = document.getElementById('m_contact').value;
+                    payload.qr = qrUrl;
+                } else if(type === 'Carpool') {
+                    payload.route = document.getElementById('c_title').value;
+                    payload.time = document.getElementById('c_time').value;
+                    payload.contact = document.getElementById('c_contact').value;
+                } else if(type === 'Job') {
+                    payload.title = document.getElementById('j_title').value;
+                    payload.pay = document.getElementById('j_pay').value;
+                    payload.contact = document.getElementById('j_contact').value;
+                }
+
+                const { error: dbError } = await _supabase.from(type).insert([payload]);
+                if(dbError) throw dbError;
 
                 alert("发布成功！");
                 location.reload();
             } catch (err) {
-                console.error(err);
-                alert("发布失败，请检查：\n1. Storage 是否开了 Policy 权限\n2. 桶名是否叫 IMAGES\n错误详情：" + err.message);
-            } finally {
-                btn.innerText = "确认发布到云数据库";
+                alert("发布失败: " + err.message);
                 btn.disabled = false;
+                btn.innerText = "确认发布";
             }
         }
 
-        // --- 3. 获取数据逻辑 ---
-        async function fetchData() {
-            const { data, error } = await _supabase
-                .from('Market')
-                .select('*')
-                .order('created_at', { ascending: false });
+        // --- 4. 界面展示逻辑 ---
+        async function loadData() {
+            const { data: mData } = await _supabase.from('Market').select('*').order('created_at', {ascending: false});
+            const { data: cData } = await _supabase.from('Carpool').select('*').order('created_at', {ascending: false});
+            const { data: jData } = await _supabase.from('Job').select('*').order('created_at', {ascending: false});
 
-            if (error) return console.error("加载失败:", error);
+            render('marketList', mData, 'Market');
+            render('carpoolList', cData, 'Carpool');
+            render('jobsList', jData, 'Job');
+        }
 
-            const container = document.getElementById('list-container');
-            container.innerHTML = data.map(item => `
+        function render(id, list, type) {
+            const box = document.getElementById(id);
+            if(!list) return box.innerHTML = "<p>暂无数据</p>";
+            box.innerHTML = list.map(item => `
                 <div class="card">
-                    <div class="price">¥${item.price || 0}</div>
-                    <h4 style="margin: 5px 0;">${item.name}</h4>
-                    <div class="img-container">
-                        ${(item.images || []).map(url => `<img src="${url}">`).join('')}
+                    ${item.qr ? '<span class="pay-badge">已附收款码</span>' : ''}
+                    <div class="gallery">
+                        ${(item.images || []).map(u => `<img src="${u}">`).join('')}
                     </div>
-                    <div style="font-size: 0.85rem; color: #666;">📞 联系: ${item.contact}</div>
+                    <div class="card-body">
+                        ${type === 'Market' ? `<div class="price">¥${item.price}</div><h4>${item.name}</h4>` : ''}
+                        ${type === 'Carpool' ? `<h4>${item.route}</h4><p>出发: ${item.time}</p>` : ''}
+                        ${type === 'Job' ? `<div style="color:var(--secondary); font-weight:bold">${item.pay}</div><h4>${item.title}</h4>` : ''}
+                        <p style="font-size:0.8rem; color:#666; margin-top:5px;">联系: ${item.contact}</p>
+                    </div>
                 </div>
             `).join('');
         }
+
+        function switchSection(id) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.getElementById(id + 'Section').classList.add('active');
+            document.getElementById('nav-' + id).classList.add('active');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('open'); }
+        function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
+        
+        window.onload = loadData;
     </script>
 </body>
 </html>
