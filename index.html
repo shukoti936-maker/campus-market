@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 原网页验证版</title>
+    <title>校园生活助手 - 增强验证版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
@@ -296,8 +296,6 @@
             btn.innerText = "正在验证...";
             btn.disabled = true;
 
-            // 重要修正：如果你在后台改的是 Magic Link 模板，
-            // type 必须设置为 'magiclink'，否则会验证失败。
             const { data, error } = await _supabase.auth.verifyOtp({
                 email: email,
                 token: code,
@@ -342,7 +340,15 @@
             document.getElementById('imgViewer').style.display = 'flex';
         }
 
+        // ================= 增加了前端拦截逻辑的详情展示函数 =================
         function showDetail(type, index) {
+            // 拦截检查：如果未登录，则不显示详情内容
+            if (!isLogin) {
+                alert("🔐 请先建立云连接验证身份后，即可查看详细联系方式及内容。");
+                openAuthModal(); // 自动弹出登录框
+                return;
+            }
+
             const item = globalData[type][index];
             if(!item) return;
 
