@@ -182,7 +182,9 @@
         }
 
         // --- 详情与删除逻辑 ---
-        function showDetail(item, type) {
+        // 【修复1】接收安全编码后的对象，防止兼职里的换行符引发 JS 报错
+        function showDetail(itemStr, type) {
+            const item = typeof itemStr === 'string' ? JSON.parse(decodeURIComponent(itemStr)) : itemStr;
             const content = document.getElementById('detailContent');
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
             const isMyPost = myPosts.includes(item.id);
@@ -197,14 +199,15 @@
                     ${item.price ? `<p class="price">¥${item.price}</p>` : ''}
                     ${item.time ? `<p>⏰ 时间：${item.time}</p>` : ''}
                     ${item.pay ? `<p>💰 薪资：${item.pay}</p>` : ''}
-                    ${item.desc ? `<p style="color:#666; font-size:0.9rem; margin-top:10px">${item.desc}</p>` : ''}
+                    ${item.desc ? `<p style="color:#666; font-size:0.9rem; margin-top:10px; white-space:pre-wrap;">${item.desc}</p>` : ''}
                     ${item.qr ? `<div style="text-align:center; margin-top:15px; background:#f0fdf4; padding:10px; border-radius:10px;">
                         <p style="font-size:12px; color:var(--secondary)">长按扫码或点击放大</p>
-                        <img src="${item.qr}" style="width:150px; cursor:pointer" onclick="viewImage('${this.src}')">
+                        <img src="${item.qr}" style="width:150px; cursor:pointer" onclick="viewImage(this.src)">
                     </div>` : ''}
                 </div>
                 ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除我发布的这条内容</button>` : ''}
             `;
+            // 注意上面的一处修复：onclick="viewImage(this.src)" 修复了原先二维码无法放大的问题
             content.innerHTML = html;
             openModal('detailModal');
         }
@@ -261,7 +264,6 @@
                 const { data, error } = await _supabase.from(type).insert([payload]).select();
                 if(error) throw error;
 
-                // 记录发布 ID 到本地，用于后续删除识别
                 const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
                 myPosts.push(data[0].id);
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
@@ -272,6 +274,7 @@
         }
 
         // --- 通用工具 ---
+        // 【修复2】完善了图片删除逻辑，点击“×”时会把文件从待上传列表里真实移除
         function handleImgs(input, preId, key) {
             Array.from(input.files).forEach(f => {
                 localFiles[key].push(f);
@@ -279,11 +282,20 @@
                 reader.onload = e => {
                     const div = document.createElement('div');
                     div.className = 'preview-item';
-                    div.innerHTML = `<img src="${e.target.result}"><div style="position:absolute;top:-5px;right:-5px;background:red;color:white;width:15px;height:15px;border-radius:50%;font-size:10px;text-align:center;cursor:pointer" onclick="this.parentElement.remove()">×</div>`;
+                    div.innerHTML = `<img src="${e.target.result}"><div class="remove-btn" style="position:absolute;top:-5px;right:-5px;background:red;color:white;width:15px;height:15px;border-radius:50%;font-size:10px;text-align:center;cursor:pointer">×</div>`;
+                    
+                    // 绑定删除事件
+                    div.querySelector('.remove-btn').onclick = function() {
+                        div.remove(); // 移除界面预览
+                        const index = localFiles[key].indexOf(f);
+                        if (index > -1) localFiles[key].splice(index, 1); // 真正从上传列表中移除
+                    };
+                    
                     document.getElementById(preId).appendChild(div);
                 };
                 reader.readAsDataURL(f);
             });
+            input.value = ''; // 清空 input 缓存，这样就算你删掉一张图后想重新选同一张图也不会出 Bug
         }
 
         async function load() {
@@ -298,23 +310,27 @@
 
         function render(id, list, type) {
             const container = document.getElementById(id);
-            container.innerHTML = list.map(item => `
-                <div class="card" onclick='showDetail(${JSON.stringify(item)}, "${type}")'>
-                    <img src="${item.images[0] || ''}" class="card-img">
+            // 【修复3】使用 encodeURIComponent 保证无论用户在兼职详情里换行还是打引号，代码都不会报错
+            container.innerHTML = list.map(item => {
+                const safeItemStr = encodeURIComponent(JSON.stringify(item));
+                return `
+                <div class="card" onclick='showDetail("${safeItemStr}", "${type}")'>
+                    <img src="${(item.images && item.images.length > 0) ? item.images[0] : ''}" class="card-img">
                     <div class="card-body">
                         ${type==='Market' ? `<div class="price">¥${item.price}</div><h4>${item.name}</h4>` : ''}
                         ${type==='Carpool' ? `<h4>${item.route}</h4><p style="font-size:12px;color:#888">${item.time}</p>` : ''}
                         ${type==='Job' ? `<div style="color:var(--secondary);font-weight:bold">${item.pay}</div><h4>${item.title}</h4>` : ''}
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function switchSection(id) {
             document.querySelectorAll('.content-section, .nav-link').forEach(el => el.classList.remove('active'));
             document.getElementById(id + 'Section').classList.add('active');
             document.getElementById('nav-' + id).classList.add('active');
-            handleSearch(); // 切换时保留搜索筛选
+            handleSearch();
         }
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
