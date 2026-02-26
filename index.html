@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 修复版</title>
+    <title>校园生活助手 - 邮箱验证版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
@@ -72,7 +72,7 @@
             <span class="search-icon">🔍</span>
         </div>
         
-        <button id="loginBtn" onclick="doLogin()" style="border:none; background:#eee; padding:8px 15px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:bold;">建立云连接</button>
+        <button id="loginBtn" onclick="openAuthModal()" style="border:none; background:#eee; padding:8px 15px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:bold;">建立云连接</button>
     </header>
 
     <main>
@@ -94,6 +94,28 @@
 
     <div id="imgViewer" onclick="this.style.display='none'">
         <img id="viewedImg" src="">
+    </div>
+
+    <div id="authModal" class="modal">
+        <div class="modal-content" style="text-align:center;">
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <h3 style="margin-bottom: 10px;">身份验证</h3>
+            <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
+            
+            <div id="loginFormArea">
+                <input type="email" id="emailInput" placeholder="输入邮箱地址接收验证链接" style="text-align:center;">
+                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送登录链接</button>
+                <p style="font-size: 11px; color: #999; margin-top: 15px;">提示：请确保您能接收到邮件。若未收到，请检查垃圾箱。</p>
+            </div>
+
+            <div id="userInfoArea" style="display: none;">
+                <p style="margin-bottom: 20px; font-size: 14px;">
+                    当前登录账号：<br>
+                    <strong id="displayUserEmail" style="color: var(--primary); font-size: 16px;"></strong>
+                </p>
+                <button class="del-btn" onclick="handleLogout()" style="margin-top: 0;">退出登录</button>
+            </div>
+        </div>
     </div>
 
     <div id="detailModal" class="modal">
@@ -168,6 +190,115 @@
             if (typeof imgData === 'string' && imgData.startsWith('http')) return imgData;
             return PLACEHOLDER;
         }
+
+        // ================= 新增：邮箱登录与状态检查逻辑 =================
+
+        // 检查用户是否已登录（刷新页面或通过邮件链接跳转回来时触发）
+        async function checkSession() {
+            const { data: { session }, error } = await _supabase.auth.getSession();
+            if (session) {
+                updateLoginState(true, session.user.email);
+            } else {
+                updateLoginState(false, null);
+            }
+
+            // 监听登录状态变化
+            _supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    updateLoginState(true, session.user.email);
+                    closeModal(); // 登录成功后自动关闭弹窗
+                } else if (event === 'SIGNED_OUT') {
+                    updateLoginState(false, null);
+                }
+            });
+        }
+
+        // 更新 UI 状态
+        function updateLoginState(loggedIn, email) {
+            isLogin = loggedIn;
+            const btn = document.getElementById('loginBtn');
+            
+            if (loggedIn && email) {
+                // 已登录 UI
+                btn.innerText = "✅ 已登录"; 
+                btn.style.background = "#dcfce7";
+                btn.style.color = "#166534";
+                
+                // 切换弹窗内容为“退出登录”面板
+                document.getElementById('loginFormArea').style.display = 'none';
+                document.getElementById('userInfoArea').style.display = 'block';
+                document.getElementById('displayUserEmail').innerText = email;
+            } else {
+                // 未登录 UI
+                btn.innerText = "建立云连接"; 
+                btn.style.background = "#eee";
+                btn.style.color = "#000";
+                
+                // 切换弹窗内容为“获取验证链接”面板
+                document.getElementById('loginFormArea').style.display = 'block';
+                document.getElementById('userInfoArea').style.display = 'none';
+            }
+        }
+
+        // 打开登录/用户信息弹窗
+        function openAuthModal() {
+            openModal('authModal');
+        }
+
+        // 处理邮箱发送逻辑与 60 秒倒计时防刷
+        async function handleEmailLogin() {
+            const email = document.getElementById('emailInput').value.trim();
+            const btn = document.getElementById('sendEmailBtn');
+
+            if (!email || !email.includes('@')) {
+                return alert("请输入正确的邮箱地址");
+            }
+
+            // 按钮倒计时防刷
+            btn.disabled = true;
+            let timer = 60;
+            const originalBg = btn.style.background;
+            btn.style.background = "#9ca3af";
+
+            const interval = setInterval(() => {
+                btn.innerText = `等待 ${timer}s`;
+                if (timer <= 0) {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                    btn.innerText = "重新获取链接";
+                    btn.style.background = originalBg;
+                }
+                timer--;
+            }, 1000);
+
+            // 调用 Supabase 发送魔术链接
+            const { error } = await _supabase.auth.signInWithOtp({
+                email: email,
+                options: {
+                    emailRedirectTo: window.location.href // 登录后重定向回当前页面
+                }
+            });
+
+            if (error) {
+                alert("发送失败: " + error.message);
+                clearInterval(interval);
+                btn.disabled = false;
+                btn.innerText = "重新发送";
+                btn.style.background = originalBg;
+            } else {
+                alert("✅ 登录链接已发送至您的邮箱！\n请前往邮箱查收，并点击邮件中的链接完成登录。");
+                btn.innerText = "邮件已发送，请去邮箱确认";
+            }
+        }
+
+        // 退出登录逻辑
+        async function handleLogout() {
+            if(confirm("确定要退出当前账号吗？")) {
+                await _supabase.auth.signOut();
+                location.reload(); // 刷新页面重置状态
+            }
+        }
+        // ================================================================
 
         // --- 搜索功能 ---
         function handleSearch() {
@@ -250,7 +381,7 @@
 
         // --- 上传逻辑 ---
         async function submit(type) {
-            if(!isLogin) return alert("请先点击右上角 [建立云连接]");
+            if(!isLogin) return alert("请先点击右上角建立连接并验证身份！");
             const btn = event.target;
             
             // 表单校验
@@ -387,14 +518,11 @@
         
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
         
-        function doLogin() { 
-            isLogin = true; 
-            document.getElementById('loginBtn').innerText = "✅ 已连接云数据库"; 
-            document.getElementById('loginBtn').style.background = "#dcfce7";
-            document.getElementById('loginBtn').style.color = "#166534";
-        }
-
-        window.onload = load;
+        // 修改了页面初始化的加载逻辑，确保先校验身份再渲染数据
+        window.onload = async () => {
+            await checkSession(); // 验证会话
+            await load(); // 获取数据
+        };
     </script>
 </body>
 </html>
