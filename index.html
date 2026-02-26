@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 增强版</title>
+    <title>校园生活助手 - 修复版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'PingFang SC', sans-serif; }
         body { background: var(--bg); color: var(--text); padding-bottom: 50px; }
         
-        /* 导航与搜索 */
         header { background: #fff; padding: 1rem 3%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 1000; flex-wrap: wrap; gap: 10px; }
         .nav-group { display: flex; align-items: center; gap: 15px; }
         .search-box { position: relative; flex-grow: 1; max-width: 300px; }
@@ -28,33 +27,27 @@
         .content-section { display: none; }
         .content-section.active { display: block; }
         
-        /* 卡片 */
         .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
         .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s; position: relative; }
         .card:hover { transform: translateY(-3px); }
-        .card-img { width: 100%; height: 180px; object-fit: cover; background: #eee; }
+        .card-img { width: 100%; height: 180px; object-fit: cover; background: #eee; display: block; }
         .card-body { padding: 12px; }
         .price { color: var(--danger); font-size: 1.1rem; font-weight: 800; }
 
-        /* 弹窗 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .modal.open { display: flex; }
         .modal-content { background: white; width: 95%; max-width: 500px; padding: 25px; border-radius: 16px; max-height: 85vh; overflow-y: auto; position: relative; }
-        .close-btn { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 50%; }
+        .close-btn { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 50%; z-index: 10; }
 
-        /* 图片浏览增强 */
-        .detail-gallery { display: flex; overflow-x: auto; gap: 10px; margin: 15px 0; scroll-snap-type: x mandatory; padding-bottom: 5px; }
-        .detail-gallery img { width: 100px; height: 100px; object-fit: cover; flex-shrink: 0; border-radius: 8px; cursor: zoom-in; }
+        .detail-gallery { display: flex; overflow-x: auto; gap: 10px; margin: 15px 0; padding-bottom: 10px; }
+        .detail-gallery img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; cursor: zoom-in; flex-shrink: 0; background: #f9f9f9; }
         
-        /* 全屏图片预览层 */
         #imgViewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; }
         #imgViewer img { max-width: 95%; max-height: 95%; object-fit: contain; }
 
-        /* 删除按钮 */
-        .del-btn { background: #fee2e2; color: var(--danger); border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-top: 20px; width: 100%; font-weight: bold; }
+        .del-btn { background: #fee2e2; color: var(--danger); border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin-top: 20px; width: 100%; font-weight: bold; }
         
-        /* 表单控件 */
-        input, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        input, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; outline: none; font-size: 1rem; }
         label { font-size: 0.85rem; color: #666; font-weight: bold; }
 
         .preview-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
@@ -66,7 +59,7 @@
 
     <header>
         <div class="nav-group">
-            <div class="logo" onclick="location.reload()">🏫 校园助手</div>
+            <div class="logo" onclick="location.reload()" style="cursor:pointer; font-weight:bold; font-size:1.2rem;">🏫 校园助手</div>
             <nav>
                 <div class="nav-link active" id="nav-market" onclick="switchSection('market')">二手</div>
                 <div class="nav-link" id="nav-carpool" onclick="switchSection('carpool')">拼车</div>
@@ -75,26 +68,26 @@
         </div>
         
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="搜索商品名称/路线/岗位..." oninput="handleSearch()">
+            <input type="text" id="searchInput" placeholder="搜索关键词..." oninput="handleSearch()">
             <span class="search-icon">🔍</span>
         </div>
         
-        <button id="loginBtn" onclick="doLogin()" style="border:none; background:#eee; padding:6px 12px; border-radius:15px; font-size:12px; cursor:pointer;">建立云连接</button>
+        <button id="loginBtn" onclick="doLogin()" style="border:none; background:#eee; padding:8px 15px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:bold;">建立云连接</button>
     </header>
 
     <main>
         <section id="marketSection" class="content-section active">
-            <div class="section-header"><h3>二手集市</h3><button class="btn-main" onclick="openModal('pubMarket')">+ 发布</button></div>
+            <div class="section-header"><h3>二手集市</h3><button class="btn-main" onclick="openModal('pubMarket')">+ 发布商品</button></div>
             <div class="data-grid" id="marketList"></div>
         </section>
 
         <section id="carpoolSection" class="content-section">
-            <div class="section-header"><h3>拼车计划</h3><button class="btn-main" onclick="openModal('pubCarpool')">+ 发布</button></div>
+            <div class="section-header"><h3>拼车计划</h3><button class="btn-main" onclick="openModal('pubCarpool')">+ 发布行程</button></div>
             <div class="data-grid" id="carpoolList"></div>
         </section>
 
         <section id="jobsSection" class="content-section">
-            <div class="section-header"><h3>兼职招聘</h3><button class="btn-main" onclick="openModal('pubJob')">+ 发布</button></div>
+            <div class="section-header"><h3>兼职招聘</h3><button class="btn-main" onclick="openModal('pubJob')">+ 发布岗位</button></div>
             <div class="data-grid" id="jobsList"></div>
         </section>
     </main>
@@ -114,12 +107,14 @@
         <div class="modal-content">
             <div class="close-btn" onclick="closeModal()">×</div>
             <h3>发布二手商品</h3>
-            <input type="text" id="m_t" placeholder="商品名称（搜索关键词）">
+            <input type="text" id="m_t" placeholder="商品名称">
             <input type="number" id="m_p" placeholder="价格 (¥)">
             <input type="text" id="m_c" placeholder="联系微信号">
-            <label>实物图：</label><input type="file" multiple onchange="handleImgs(this, 'pre_m', 'store_m')">
+            <label>上传实物图（多选）：</label>
+            <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')">
             <div class="preview-grid" id="pre_m"></div>
-            <label>收款码(可选)：</label><input type="file" onchange="handleImgs(this, 'pre_q', 'store_q')">
+            <label>收款码(可选)：</label>
+            <input type="file" accept="image/*" onchange="handleImgs(this, 'pre_q', 'store_q')">
             <div class="preview-grid" id="pre_q"></div>
             <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button>
         </div>
@@ -130,9 +125,10 @@
             <div class="close-btn" onclick="closeModal()">×</div>
             <h3>发布拼车行程</h3>
             <input type="text" id="c_t" placeholder="出发地 - 目的地">
-            <input type="text" id="c_time" placeholder="出发时间">
-            <input type="text" id="c_c" placeholder="联系方式">
-            <label>相关图片：</label><input type="file" multiple onchange="handleImgs(this, 'pre_c', 'store_c')">
+            <input type="text" id="c_time" placeholder="出发时间（如：明日下午2点）">
+            <input type="text" id="c_c" placeholder="联系微信号/手机号">
+            <label>行程相关图：</label>
+            <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_c', 'store_c')">
             <div class="preview-grid" id="pre_c"></div>
             <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Carpool')">确认发布</button>
         </div>
@@ -143,16 +139,18 @@
             <div class="close-btn" onclick="closeModal()">×</div>
             <h3>发布兼职招聘</h3>
             <input type="text" id="j_t" placeholder="岗位名称">
-            <input type="text" id="j_p" placeholder="薪资/待遇">
-            <textarea id="j_d" placeholder="详细要求" rows="3"></textarea>
-            <input type="text" id="j_c" placeholder="联系方式">
-            <label>海报/环境图：</label><input type="file" multiple onchange="handleImgs(this, 'pre_j', 'store_j')">
+            <input type="text" id="j_p" placeholder="薪资/待遇（如：200/天）">
+            <textarea id="j_d" placeholder="工作内容及要求" rows="4"></textarea>
+            <input type="text" id="j_c" placeholder="联系人及联系方式">
+            <label>海报/环境图：</label>
+            <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_j', 'store_j')">
             <div class="preview-grid" id="pre_j"></div>
             <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Job')">确认发布</button>
         </div>
     </div>
 
     <script>
+        // 初始化 Supabase
         const SUPABASE_URL = 'https://xhcqqnpzyafvjsxyndya.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_gsBzkYayDH3Z3jbEENOLrA__a7tf2TA';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -161,120 +159,159 @@
         let globalData = { Market: [], Carpool: [], Job: [] };
         let localFiles = { store_m: [], store_q: [], store_c: [], store_j: [] };
 
+        // 占位图地址
+        const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
+
+        // 工具：安全获取图片地址
+        function getSafeImg(imgData) {
+            if (Array.isArray(imgData) && imgData.length > 0) return imgData[0];
+            if (typeof imgData === 'string' && imgData.startsWith('http')) return imgData;
+            return PLACEHOLDER;
+        }
+
         // --- 搜索功能 ---
         function handleSearch() {
             const keyword = document.getElementById('searchInput').value.toLowerCase();
             const currentTab = document.querySelector('.nav-link.active').id.split('-')[1];
             const tabMap = { market: 'Market', carpool: 'Carpool', jobs: 'Job' };
+            const type = tabMap[currentTab];
             const listId = currentTab + 'List';
             
-            const filtered = globalData[tabMap[currentTab]].filter(item => {
+            const filtered = globalData[type].filter(item => {
                 const title = (item.name || item.route || item.title || "").toLowerCase();
                 return title.includes(keyword);
             });
-            render(listId, filtered, tabMap[currentTab]);
+            render(listId, filtered, type);
         }
 
-        // --- 图片浏览功能 ---
         function viewImage(url) {
+            if(!url || url === PLACEHOLDER) return;
             document.getElementById('viewedImg').src = url;
             document.getElementById('imgViewer').style.display = 'flex';
         }
 
-        // --- 详情与删除逻辑 ---
-        // 【修复1】接收安全编码后的对象，防止兼职里的换行符引发 JS 报错
-        function showDetail(itemStr, type) {
-            const item = typeof itemStr === 'string' ? JSON.parse(decodeURIComponent(itemStr)) : itemStr;
+        // --- 渲染详情 ---
+        function showDetail(type, index) {
+            // 通过类型和索引从全局变量取值，避免 HTML 属性传参导致的 Bug
+            const item = globalData[type][index];
+            if(!item) return;
+
             const content = document.getElementById('detailContent');
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
             const isMyPost = myPosts.includes(item.id);
 
+            // 处理图片列表
+            const images = Array.isArray(item.images) ? item.images : [];
+
             let html = `
                 <div class="detail-gallery">
-                    ${(item.images || []).map(u => `<img src="${u}" onclick="viewImage('${u}')" title="点击放大">`).join('')}
+                    ${images.length > 0 ? 
+                        images.map(u => `<img src="${u}" onclick="viewImage('${u}')" onerror="this.src='${PLACEHOLDER}'">`).join('') :
+                        `<img src="${PLACEHOLDER}" style="cursor:default">`
+                    }
                 </div>
                 <div style="padding:10px 0">
-                    <h2 style="color:var(--primary)">${item.name || item.route || item.title}</h2>
-                    <p style="margin:10px 0"><b>详情/联系：</b>${item.contact}</p>
-                    ${item.price ? `<p class="price">¥${item.price}</p>` : ''}
-                    ${item.time ? `<p>⏰ 时间：${item.time}</p>` : ''}
-                    ${item.pay ? `<p>💰 薪资：${item.pay}</p>` : ''}
-                    ${item.desc ? `<p style="color:#666; font-size:0.9rem; margin-top:10px; white-space:pre-wrap;">${item.desc}</p>` : ''}
-                    ${item.qr ? `<div style="text-align:center; margin-top:15px; background:#f0fdf4; padding:10px; border-radius:10px;">
-                        <p style="font-size:12px; color:var(--secondary)">长按扫码或点击放大</p>
-                        <img src="${item.qr}" style="width:150px; cursor:pointer" onclick="viewImage(this.src)">
-                    </div>` : ''}
+                    <h2 style="color:var(--primary); margin-bottom:15px">${item.name || item.route || item.title}</h2>
+                    
+                    <div style="background:#f9fafb; padding:15px; border-radius:12px; margin-bottom:15px">
+                        <p style="margin-bottom:8px"><b>📱 联系方式：</b><span style="color:var(--primary); font-weight:bold">${item.contact || '未填写'}</span></p>
+                        ${item.price ? `<p style="margin-bottom:8px"><b>💰 价格：</b><span class="price">¥${item.price}</span></p>` : ''}
+                        ${item.time ? `<p style="margin-bottom:8px"><b>⏰ 出发时间：</b>${item.time}</p>` : ''}
+                        ${item.pay ? `<p style="margin-bottom:8px"><b>💎 薪资待遇：</b><span style="color:var(--secondary); font-weight:bold">${item.pay}</span></p>` : ''}
+                    </div>
+
+                    ${item.desc ? `
+                        <p style="color:#666; font-size:0.95rem; line-height:1.6; white-space:pre-wrap; background:#fff; border-left:4px solid #ddd; padding-left:10px; margin:15px 0;">${item.desc}</p>
+                    ` : ''}
+
+                    ${item.qr ? `
+                        <div style="text-align:center; margin-top:20px; background:#f0fdf4; padding:15px; border-radius:12px; border:1px dashed var(--secondary)">
+                            <p style="font-size:12px; color:var(--secondary); margin-bottom:10px">长按扫码或点击放大收款码/微信号</p>
+                            <img src="${item.qr}" style="width:180px; border-radius:8px; cursor:pointer" onclick="viewImage(this.src)" onerror="this.style.display='none'">
+                        </div>
+                    ` : ''}
                 </div>
-                ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除我发布的这条内容</button>` : ''}
+                ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除此条发布</button>` : ''}
             `;
-            // 注意上面的一处修复：onclick="viewImage(this.src)" 修复了原先二维码无法放大的问题
+            
             content.innerHTML = html;
             openModal('detailModal');
         }
 
         async function deletePost(id, type) {
-            if(!confirm("确定要永久删除这条发布吗？")) return;
+            if(!confirm("确定要删除吗？删除后不可恢复。")) return;
             try {
                 const { error } = await _supabase.from(type).delete().eq('id', id);
                 if(error) throw error;
-                alert("已成功删除");
+                alert("已删除");
                 location.reload();
             } catch (e) { alert("删除失败: " + e.message); }
         }
 
-        // --- 核心上传逻辑 ---
+        // --- 上传逻辑 ---
         async function submit(type) {
-            if(!isLogin) return alert("请先连接云端");
+            if(!isLogin) return alert("请先点击右上角 [建立云连接]");
             const btn = event.target;
-            btn.innerText = "处理中..."; btn.disabled = true;
+            
+            // 表单校验
+            const contactVal = document.getElementById(type[0].toLowerCase()+'_c').value;
+            if(!contactVal) return alert("请填写联系方式，方便他人联系你");
+
+            btn.innerText = "正在上传图片并发布..."; btn.disabled = true;
 
             try {
                 let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
                 const imgUrls = [];
+                
+                // 循环上传图片
                 for(let f of localFiles[key]) {
-                    const fname = `${Date.now()}_${f.name}`;
-                    await _supabase.storage.from('images').upload(fname, f);
+                    const fname = `public/${Date.now()}_${f.name.replace(/[^\x00-\x7F]/g, "")}`;
+                    const { data, error } = await _supabase.storage.from('images').upload(fname, f);
+                    if(error) throw error;
                     imgUrls.push(_supabase.storage.from('images').getPublicUrl(fname).data.publicUrl);
                 }
 
+                // 处理收款码
                 let qrUrl = "";
                 if(type === 'Market' && localFiles.store_q.length > 0) {
-                    const qname = `QR_${Date.now()}.png`;
+                    const qname = `qr/QR_${Date.now()}.png`;
                     await _supabase.storage.from('images').upload(qname, localFiles.store_q[0]);
                     qrUrl = _supabase.storage.from('images').getPublicUrl(qname).data.publicUrl;
                 }
 
-                const payload = { 
-                    images: imgUrls, 
-                    contact: document.getElementById(type[0].toLowerCase()+'_c').value 
-                };
+                // 构造提交数据
+                const payload = { images: imgUrls, contact: contactVal };
                 if(type === 'Market') {
-                    payload.name = document.getElementById('m_t').value;
-                    payload.price = document.getElementById('m_p').value;
+                    payload.name = document.getElementById('m_t').value || "未命名商品";
+                    payload.price = document.getElementById('m_p').value || "0";
                     payload.qr = qrUrl;
                 } else if(type === 'Carpool') {
-                    payload.route = document.getElementById('c_t').value;
-                    payload.time = document.getElementById('c_time').value;
+                    payload.route = document.getElementById('c_t').value || "未定路线";
+                    payload.time = document.getElementById('c_time').value || "随时";
                 } else if(type === 'Job') {
-                    payload.title = document.getElementById('j_t').value;
-                    payload.pay = document.getElementById('j_p').value;
-                    payload.desc = document.getElementById('j_d').value;
+                    payload.title = document.getElementById('j_t').value || "兼职岗位";
+                    payload.pay = document.getElementById('j_p').value || "面议";
+                    payload.desc = document.getElementById('j_d').value || "";
                 }
 
                 const { data, error } = await _supabase.from(type).insert([payload]).select();
                 if(error) throw error;
 
+                // 记录为我的发布
                 const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
                 myPosts.push(data[0].id);
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
 
-                alert("发布成功！");
+                alert("恭喜！发布成功");
                 location.reload();
-            } catch (e) { alert("错误: " + e.message); btn.disabled = false; btn.innerText = "确认发布"; }
+            } catch (e) { 
+                console.error(e);
+                alert("发布失败，请检查网络或存储权限: " + e.message); 
+                btn.disabled = false; btn.innerText = "确认发布"; 
+            }
         }
 
-        // --- 通用工具 ---
-        // 【修复2】完善了图片删除逻辑，点击“×”时会把文件从待上传列表里真实移除
+        // --- 图片选择预览 ---
         function handleImgs(input, preId, key) {
             Array.from(input.files).forEach(f => {
                 localFiles[key].push(f);
@@ -282,43 +319,55 @@
                 reader.onload = e => {
                     const div = document.createElement('div');
                     div.className = 'preview-item';
-                    div.innerHTML = `<img src="${e.target.result}"><div class="remove-btn" style="position:absolute;top:-5px;right:-5px;background:red;color:white;width:15px;height:15px;border-radius:50%;font-size:10px;text-align:center;cursor:pointer">×</div>`;
-                    
-                    // 绑定删除事件
-                    div.querySelector('.remove-btn').onclick = function() {
-                        div.remove(); // 移除界面预览
-                        const index = localFiles[key].indexOf(f);
-                        if (index > -1) localFiles[key].splice(index, 1); // 真正从上传列表中移除
+                    div.innerHTML = `
+                        <img src="${e.target.result}">
+                        <div style="position:absolute;top:-5px;right:-5px;background:var(--danger);color:white;width:18px;height:18px;border-radius:50%;font-size:12px;text-align:center;line-height:18px;cursor:pointer;font-weight:bold">×</div>
+                    `;
+                    div.onclick = () => {
+                        div.remove();
+                        localFiles[key] = localFiles[key].filter(file => file !== f);
                     };
-                    
                     document.getElementById(preId).appendChild(div);
                 };
                 reader.readAsDataURL(f);
             });
-            input.value = ''; // 清空 input 缓存，这样就算你删掉一张图后想重新选同一张图也不会出 Bug
+            input.value = '';
         }
 
+        // --- 数据加载 ---
         async function load() {
-            const { data: m } = await _supabase.from('Market').select('*').order('created_at', {ascending:false});
-            const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
-            const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
-            globalData = { Market: m||[], Carpool: c||[], Job: j||[] };
-            render('marketList', globalData.Market, 'Market');
-            render('carpoolList', globalData.Carpool, 'Carpool');
-            render('jobsList', globalData.Job, 'Job');
+            try {
+                const { data: m } = await _supabase.from('Market').select('*').order('created_at', {ascending:false});
+                const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
+                const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
+                
+                globalData = { Market: m||[], Carpool: c||[], Job: j||[] };
+                
+                render('marketList', globalData.Market, 'Market');
+                render('carpoolList', globalData.Carpool, 'Carpool');
+                render('jobsList', globalData.Job, 'Job');
+            } catch (e) {
+                console.log("加载失败:", e.message);
+            }
         }
 
         function render(id, list, type) {
             const container = document.getElementById(id);
-            // 【修复3】使用 encodeURIComponent 保证无论用户在兼职详情里换行还是打引号，代码都不会报错
-            container.innerHTML = list.map(item => {
-                const safeItemStr = encodeURIComponent(JSON.stringify(item));
+            if(!list || list.length === 0) {
+                container.innerHTML = `<p style="grid-column:1/-1; text-align:center; padding:40px; color:#999;">暂无内容，快去发布吧~</p>`;
+                return;
+            }
+
+            container.innerHTML = list.map((item, index) => {
+                // 安全获取首图
+                const cover = getSafeImg(item.images);
+
                 return `
-                <div class="card" onclick='showDetail("${safeItemStr}", "${type}")'>
-                    <img src="${(item.images && item.images.length > 0) ? item.images[0] : ''}" class="card-img">
+                <div class="card" onclick="showDetail('${type}', ${index})">
+                    <img src="${cover}" class="card-img" onerror="this.src='${PLACEHOLDER}'">
                     <div class="card-body">
                         ${type==='Market' ? `<div class="price">¥${item.price}</div><h4>${item.name}</h4>` : ''}
-                        ${type==='Carpool' ? `<h4>${item.route}</h4><p style="font-size:12px;color:#888">${item.time}</p>` : ''}
+                        ${type==='Carpool' ? `<h4>${item.route}</h4><p style="font-size:12px;color:#888;margin-top:5px">⏰ ${item.time}</p>` : ''}
                         ${type==='Job' ? `<div style="color:var(--secondary);font-weight:bold">${item.pay}</div><h4>${item.title}</h4>` : ''}
                     </div>
                 </div>
@@ -326,15 +375,24 @@
             }).join('');
         }
 
+        // --- UI 控制 ---
         function switchSection(id) {
             document.querySelectorAll('.content-section, .nav-link').forEach(el => el.classList.remove('active'));
             document.getElementById(id + 'Section').classList.add('active');
             document.getElementById('nav-' + id).classList.add('active');
-            handleSearch();
+            window.scrollTo(0,0);
         }
+        
         function openModal(id) { document.getElementById(id).classList.add('open'); }
+        
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
-        function doLogin() { isLogin = true; document.getElementById('loginBtn').innerText = "✅ 云连接已建立"; alert("已接入校园云数据库"); }
+        
+        function doLogin() { 
+            isLogin = true; 
+            document.getElementById('loginBtn').innerText = "✅ 已连接云数据库"; 
+            document.getElementById('loginBtn').style.background = "#dcfce7";
+            document.getElementById('loginBtn').style.color = "#166534";
+        }
 
         window.onload = load;
     </script>
