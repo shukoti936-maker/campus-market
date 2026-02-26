@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 邮箱验证版</title>
+    <title>校园生活助手 - 原网页验证版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
@@ -103,9 +103,16 @@
             <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
             
             <div id="loginFormArea">
-                <input type="email" id="emailInput" placeholder="输入邮箱地址接收验证链接" style="text-align:center;">
-                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送登录链接</button>
-                <p style="font-size: 11px; color: #999; margin-top: 15px;">提示：请确保您能接收到邮件。若未收到，请检查垃圾箱。</p>
+                <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
+                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
+                
+                <div id="verifyArea" style="display: none; margin-top: 15px; background: #f9fafb; padding: 15px; border-radius: 8px;">
+                    <label style="display: block; text-align: left; margin-bottom: 5px;">请输入邮箱收到的 6 位验证码：</label>
+                    <input type="text" id="codeInput" placeholder="------" maxlength="6" style="text-align:center; letter-spacing: 5px; font-size: 1.2rem; font-weight: bold;">
+                    <button class="btn-main" onclick="handleVerifyCode()" style="width:100%; margin-top:10px; background: var(--secondary);">确认并在本页登录</button>
+                </div>
+
+                <p style="font-size: 11px; color: #999; margin-top: 15px;">提示：请不要关闭此页面，去邮箱查看验证码后返回这里输入。</p>
             </div>
 
             <div id="userInfoArea" style="display: none;">
@@ -191,9 +198,9 @@
             return PLACEHOLDER;
         }
 
-        // ================= 新增：邮箱登录与状态检查逻辑 =================
+        // ================= 新增与修改：验证码登录逻辑 =================
 
-        // 检查用户是否已登录（刷新页面或通过邮件链接跳转回来时触发）
+        // 检查用户是否已登录
         async function checkSession() {
             const { data: { session }, error } = await _supabase.auth.getSession();
             if (session) {
@@ -234,9 +241,11 @@
                 btn.style.background = "#eee";
                 btn.style.color = "#000";
                 
-                // 切换弹窗内容为“获取验证链接”面板
+                // 切换弹窗内容为“获取验证链接”面板，并重置表单状态
                 document.getElementById('loginFormArea').style.display = 'block';
                 document.getElementById('userInfoArea').style.display = 'none';
+                document.getElementById('verifyArea').style.display = 'none'; // 隐藏验证码输入框
+                document.getElementById('codeInput').value = ''; // 清空验证码
             }
         }
 
@@ -245,7 +254,7 @@
             openModal('authModal');
         }
 
-        // 处理邮箱发送逻辑与 60 秒倒计时防刷
+        // 第一步：处理邮箱发送逻辑与 60 秒倒计时防刷
         async function handleEmailLogin() {
             const email = document.getElementById('emailInput').value.trim();
             const btn = document.getElementById('sendEmailBtn');
@@ -265,18 +274,15 @@
                 if (timer <= 0) {
                     clearInterval(interval);
                     btn.disabled = false;
-                    btn.innerText = "重新获取链接";
+                    btn.innerText = "重新获取验证码";
                     btn.style.background = originalBg;
                 }
                 timer--;
             }, 1000);
 
-            // 调用 Supabase 发送魔术链接
+            // 调用 Supabase 发送带有 6 位验证码的邮件
             const { error } = await _supabase.auth.signInWithOtp({
-                email: email,
-                options: {
-                    emailRedirectTo: window.location.href // 登录后重定向回当前页面
-                }
+                email: email
             });
 
             if (error) {
@@ -286,8 +292,40 @@
                 btn.innerText = "重新发送";
                 btn.style.background = originalBg;
             } else {
-                alert("✅ 登录链接已发送至您的邮箱！\n请前往邮箱查收，并点击邮件中的链接完成登录。");
-                btn.innerText = "邮件已发送，请去邮箱确认";
+                // 发送成功，显示验证码输入区域
+                document.getElementById('verifyArea').style.display = 'block';
+                alert("✅ 验证码已发送！\n请不要关闭当前网页，前往邮箱查看 6 位数字验证码，然后在此页面输入即可。");
+            }
+        }
+
+        // 第二步：在本页验证 6 位数验证码
+        async function handleVerifyCode() {
+            const email = document.getElementById('emailInput').value.trim();
+            const code = document.getElementById('codeInput').value.trim();
+            const btn = event.target; // 获取当前按钮
+
+            if (!code || code.length !== 6) {
+                return alert("请输入完整的 6 位数字验证码");
+            }
+
+            const originalText = btn.innerText;
+            btn.innerText = "正在验证...";
+            btn.disabled = true;
+
+            // 验证 OTP 验证码
+            const { data, error } = await _supabase.auth.verifyOtp({
+                email: email,
+                token: code,
+                type: 'email'
+            });
+
+            if (error) {
+                alert("验证失败，验证码错误或已过期: " + error.message);
+                btn.disabled = false;
+                btn.innerText = originalText;
+            } else {
+                alert("✅ 身份验证成功，欢迎回来！");
+                // 成功后 supabase.auth.onAuthStateChange 会自动执行并更新状态
             }
         }
 
@@ -518,7 +556,7 @@
         
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
         
-        // 修改了页面初始化的加载逻辑，确保先校验身份再渲染数据
+        // 页面初始化
         window.onload = async () => {
             await checkSession(); // 验证会话
             await load(); // 获取数据
