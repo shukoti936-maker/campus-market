@@ -112,14 +112,14 @@
 
             <div id="loginFormArea">
                 <input type="email" id="emailInput" placeholder="请输入您的邮箱" style="text-align:center;">
-                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;" disabled>请先通过IP验证</button>
+                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;" disabled>正在验证网络环境...</button>
                 
                 <div id="verifyArea" style="display: none; margin-top: 15px; background: #f9fafb; padding: 15px; border-radius: 8px;">
                     <label style="display: block; text-align: left; margin-bottom: 5px;">请输入邮箱收到的验证码：</label>
                     <input type="text" id="codeInput" placeholder="6位数字" style="text-align:center; letter-spacing: 5px; font-size: 1.2rem; font-weight: bold;">
                     <button class="btn-main" onclick="handleVerifyCode()" style="width:100%; margin-top:10px; background: var(--secondary);">确认并登录</button>
                 </div>
-                <p id="ipHint" style="font-size: 11px; color: #ef4444; margin-top: 15px; font-weight: bold;">⚠️ 访问受限：本系统仅限山东第二医科大学内网(172.22.x.x)用户使用</p>
+                <p id="ipHint" style="font-size: 11px; color: #ef4444; margin-top: 15px; font-weight: bold;">⚠️ 访问受限：本系统仅限山东第二医科大学校内网络用户使用</p>
             </div>
 
             <div id="userInfoArea" style="display: none;">
@@ -186,7 +186,7 @@
         let localFiles = { store_m: [], store_q: [], store_c: [], store_j: [] };
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // ================= 核心：IP 物理验证硬核代码段 =================
+        // ================= 核心：IP 物理验证硬核代码段 (已更新为112.253.x.x出口段) =================
 
         function ipToLong(ip) {
             var d = ip.split('.');
@@ -201,21 +201,30 @@
             const boxEl = document.getElementById('ipStatusBox');
 
             try {
-                // 获取当前真实出口 IP
-                const res = await fetch('https://api.ipify.org?format=json');
+                // 使用国内稳定的接口抓取出口 IP (无需梯子)
+                const res = await fetch('https://whois.pconline.com.cn/ipJson.jsp?json=true');
                 const data = await res.json();
                 const userIP = data.ip;
                 ipEl.innerText = userIP;
 
-                // 定义合法的校园网段 (172.22.0.1 - 172.22.255.254)
-                const start = ipToLong("172.22.0.1");
-                const end = ipToLong("172.22.255.254");
+                // --- 定义合法范围 ---
+                // 1. 内网私有段
+                const internalStart = ipToLong("172.22.0.1");
+                const internalEnd = ipToLong("172.22.255.254");
+                
+                // 2. 查得的出口公网段 (112.253.0.0 - 112.253.255.255)
+                const publicStart = ipToLong("112.253.0.0");
+                const publicEnd = ipToLong("112.253.255.255");
+                
                 const current = ipToLong(userIP);
 
-                // 执行严格比对
-                if (current >= start && current <= end) {
+                // 执行判定：只要在内网段 或 在学校出口公网段，均视为通过
+                const isInternal = (current >= internalStart && current <= internalEnd);
+                const isPublicSchoolNet = (current >= publicStart && current <= publicEnd);
+
+                if (isInternal || isPublicSchoolNet) {
                     isIpAllowed = true;
-                    tagEl.innerHTML = '<span class="ip-tag tag-ok">✅ 校验通过：校园网环境</span>';
+                    tagEl.innerHTML = '<span class="ip-tag tag-ok">✅ 校验通过：已锁定校内物理位置</span>';
                     loginBtn.disabled = false;
                     loginBtn.innerText = "获取邮箱验证码";
                     hintEl.style.display = 'none';
@@ -230,7 +239,7 @@
                 }
             } catch (e) {
                 ipEl.innerText = "网络连接异常";
-                tagEl.innerText = "无法连接到身份验证网关";
+                tagEl.innerText = "无法同步网关数据，请检查校园网连接";
                 isIpAllowed = false;
             }
         }
@@ -245,21 +254,20 @@
         }
 
         async function handleEmailLogin() {
-            // 登录前的最后一道防线：再次检查 isIpAllowed 标记
             if (!isIpAllowed) {
-                alert("安全警告：您的 IP 不在 172.22.x.x 范围内，无法进行云连接操作！");
+                alert("安全警告：您的网络环境不在校内授权范围内，无法继续操作！");
                 return;
             }
 
             const email = document.getElementById('emailInput').value.trim();
             const btn = document.getElementById('sendEmailBtn');
-            if (!email || !email.includes('@')) return alert("请输入正确的学校邮箱地址");
+            if (!email || !email.includes('@')) return alert("请输入正确的邮箱地址");
 
             btn.disabled = true;
             let timer = 60;
             const interval = setInterval(() => {
                 btn.innerText = `重新获取(${timer}s)`;
-                if (timer <= 0) { clearInterval(interval); btn.disabled = false; btn.innerText = "发送验证码"; }
+                if (timer <= 0) { clearInterval(interval); btn.disabled = false; btn.innerText = "获取验证码"; }
                 timer--;
             }, 1000);
 
@@ -270,11 +278,11 @@
                 btn.disabled = false;
             } else {
                 document.getElementById('verifyArea').style.display = 'block';
-                alert("验证码已发送至您的邮箱，请查收！");
+                alert("验证码已发送至您的邮箱！");
             }
         }
 
-        // ================= 业务核心功能代码（完整保留） =================
+        // ================= 业务核心功能代码 =================
 
         async function checkSession() {
             const { data: { session } } = await _supabase.auth.getSession();
@@ -321,7 +329,7 @@
         }
 
         function showDetail(type, index) {
-            if (!isLogin) { alert("🔐 为了校园安全，查看联系方式需要先建立云连接"); openAuthModal(); return; }
+            if (!isLogin) { alert("🔐 查看联系方式需要先建立校内云连接"); openAuthModal(); return; }
             const item = globalData[type][index];
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
             const isMyPost = myPosts.includes(item.id);
@@ -338,7 +346,7 @@
                     </div>
                     ${item.desc ? `<p style="white-space:pre-wrap; border-left:4px solid #ddd; padding-left:10px">${item.desc}</p>` : ''}
                 </div>
-                ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除我发布的这条信息</button>` : ''}
+                ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除发布</button>` : ''}
             `;
             openModal('detailModal');
         }
@@ -372,7 +380,7 @@
                 myPosts.push(data[0].id);
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
                 alert("发布成功！"); location.reload();
-            } catch (e) { alert("发布失败，请检查网络: " + e.message); btn.disabled = false; btn.innerText = "确认发布"; }
+            } catch (e) { alert("发布失败: " + e.message); btn.disabled = false; btn.innerText = "确认发布"; }
         }
 
         function handleImgs(input, preId, key) {
@@ -402,7 +410,7 @@
 
         function render(id, list, type) {
             const container = document.getElementById(id);
-            if(list.length === 0) { container.innerHTML = '<p style="color:#999; padding:20px;">暂无发布内容...</p>'; return; }
+            if(list.length === 0) { container.innerHTML = '<p style="color:#999; padding:20px;">暂无内容...</p>'; return; }
             container.innerHTML = list.map((item, index) => `
                 <div class="card" onclick="showDetail('${type}', ${index})">
                     <img src="${(item.images&&item.images[0])||PLACEHOLDER}" class="card-img">
@@ -426,7 +434,6 @@
         window.onload = async () => { 
             await checkSession(); 
             await load(); 
-            // 页面加载即进行一次隐形校验
             await verifyDeviceIP();
         };
     </script>
