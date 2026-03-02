@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 增强验证版</title>
+    <title>校园生活助手 - 物理网段验证版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
@@ -40,11 +40,11 @@
         .modal-content { background: white; width: 95%; max-width: 500px; padding: 25px; border-radius: 16px; max-height: 85vh; overflow-y: auto; position: relative; }
         .close-btn { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 50%; z-index: 10; }
 
-        /* IP 验证样式 */
-        .ip-monitor { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 10px; margin-bottom: 20px; text-align: left; }
-        .ip-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-left: 5px; }
-        .tag-ok { background: #dcfce7; color: #166534; }
-        .tag-fail { background: #fee2e2; color: #991b1b; }
+        /* IP 验证增强样式 */
+        .ip-monitor { background: #f8fafc; border: 2px solid #e2e8f0; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: left; }
+        .ip-tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-top: 8px; }
+        .tag-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .tag-fail { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
 
         .detail-gallery { display: flex; overflow-x: auto; gap: 10px; margin: 15px 0; padding-bottom: 10px; }
         .detail-gallery img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; cursor: zoom-in; flex-shrink: 0; background: #f9f9f9; }
@@ -99,30 +99,27 @@
         </section>
     </main>
 
-    <div id="imgViewer" onclick="this.style.display='none'">
-        <img id="viewedImg" src="">
-    </div>
-
     <div id="authModal" class="modal">
         <div class="modal-content" style="text-align:center;">
             <div class="close-btn" onclick="closeModal()">×</div>
-            <h3 style="margin-bottom: 15px;">身份与网络验证</h3>
+            <h3 style="margin-bottom: 15px;">身份与校园网验证</h3>
             
             <div class="ip-monitor" id="ipStatusBox">
-                <div style="font-size: 13px;">当前访问IP：<span id="currentIP" style="font-family: monospace; font-weight: bold;">获取中...</span></div>
-                <div style="font-size: 13px; margin-top: 5px;">网络环境：<span id="netTag">正在检测安全环境...</span></div>
+                <div style="font-size: 14px; color: #444;">系统检测到您的出口IP：</div>
+                <div id="currentIP" style="font-family: monospace; font-weight: bold; font-size: 18px; margin: 5px 0; color: var(--primary);">正在检测...</div>
+                <div id="netTag">⏳ 正在同步网关数据...</div>
             </div>
 
             <div id="loginFormArea">
-                <input type="email" id="emailInput" placeholder="输入学校邮箱" style="text-align:center;">
-                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;" disabled>检测中...</button>
+                <input type="email" id="emailInput" placeholder="请输入您的邮箱" style="text-align:center;">
+                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;" disabled>请先通过IP验证</button>
                 
                 <div id="verifyArea" style="display: none; margin-top: 15px; background: #f9fafb; padding: 15px; border-radius: 8px;">
                     <label style="display: block; text-align: left; margin-bottom: 5px;">请输入邮箱收到的验证码：</label>
-                    <input type="text" id="codeInput" placeholder="输入数字" style="text-align:center; letter-spacing: 5px; font-size: 1.2rem; font-weight: bold;">
-                    <button class="btn-main" onclick="handleVerifyCode()" style="width:100%; margin-top:10px; background: var(--secondary);">确认并在本页登录</button>
+                    <input type="text" id="codeInput" placeholder="6位数字" style="text-align:center; letter-spacing: 5px; font-size: 1.2rem; font-weight: bold;">
+                    <button class="btn-main" onclick="handleVerifyCode()" style="width:100%; margin-top:10px; background: var(--secondary);">确认并登录</button>
                 </div>
-                <p style="font-size: 11px; color: #999; margin-top: 15px;">仅限校园网内网段 (172.22.x.x) 访问</p>
+                <p id="ipHint" style="font-size: 11px; color: #ef4444; margin-top: 15px; font-weight: bold;">⚠️ 访问受限：本系统仅限山东第二医科大学内网(172.22.x.x)用户使用</p>
             </div>
 
             <div id="userInfoArea" style="display: none;">
@@ -132,6 +129,7 @@
         </div>
     </div>
 
+    <div id="imgViewer" onclick="this.style.display='none'"><img id="viewedImg" src=""></div>
     <div id="detailModal" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><div id="detailContent"></div></div></div>
     
     <div id="pubMarket" class="modal">
@@ -144,9 +142,6 @@
             <label>上传实物图（多选）：</label>
             <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')">
             <div class="preview-grid" id="pre_m"></div>
-            <label>收款码(可选)：</label>
-            <input type="file" accept="image/*" onchange="handleImgs(this, 'pre_q', 'store_q')">
-            <div class="preview-grid" id="pre_q"></div>
             <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button>
         </div>
     </div>
@@ -186,14 +181,13 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let isLogin = false;
-        let isIpAllowed = false; // IP 合法性全局标记
+        let isIpAllowed = false; 
         let globalData = { Market: [], Carpool: [], Job: [] };
         let localFiles = { store_m: [], store_q: [], store_c: [], store_j: [] };
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // ================= 核心：IP 抓取与验证逻辑段 =================
+        // ================= 核心：IP 物理验证硬核代码段 =================
 
-        // IP 转数字工具
         function ipToLong(ip) {
             var d = ip.split('.');
             return ((((((+d[0])*256)+(+d[1]))*256)+(+d[2]))*256)+(+d[3]);
@@ -203,62 +197,69 @@
             const ipEl = document.getElementById('currentIP');
             const tagEl = document.getElementById('netTag');
             const loginBtn = document.getElementById('sendEmailBtn');
+            const hintEl = document.getElementById('ipHint');
+            const boxEl = document.getElementById('ipStatusBox');
 
             try {
-                // 抓取公网出口IP
+                // 获取当前真实出口 IP
                 const res = await fetch('https://api.ipify.org?format=json');
                 const data = await res.json();
                 const userIP = data.ip;
                 ipEl.innerText = userIP;
 
-                // 定义范围: 172.22.0.1 - 172.22.255.254
+                // 定义合法的校园网段 (172.22.0.1 - 172.22.255.254)
                 const start = ipToLong("172.22.0.1");
                 const end = ipToLong("172.22.255.254");
                 const current = ipToLong(userIP);
 
+                // 执行严格比对
                 if (current >= start && current <= end) {
-                    tagEl.innerHTML = '<span class="ip-tag tag-ok">验证通过：校内合法网络</span>';
-                    loginBtn.disabled = false;
-                    loginBtn.innerText = "发送验证码";
                     isIpAllowed = true;
+                    tagEl.innerHTML = '<span class="ip-tag tag-ok">✅ 校验通过：校园网环境</span>';
+                    loginBtn.disabled = false;
+                    loginBtn.innerText = "获取邮箱验证码";
+                    hintEl.style.display = 'none';
+                    boxEl.style.borderColor = "#10b981";
                 } else {
-                    tagEl.innerHTML = '<span class="ip-tag tag-fail">验证失败：非本校内网</span>';
+                    isIpAllowed = false;
+                    tagEl.innerHTML = '<span class="ip-tag tag-fail">❌ 校验失败：非指定校内网段</span>';
                     loginBtn.disabled = true;
                     loginBtn.innerText = "登录受限(非校园网)";
-                    isIpAllowed = false;
-                    document.getElementById('ipStatusBox').style.borderColor = "#ef4444";
+                    hintEl.style.display = 'block';
+                    boxEl.style.borderColor = "#ef4444";
                 }
             } catch (e) {
-                ipEl.innerText = "获取失败";
-                tagEl.innerText = "请检查联网状态";
+                ipEl.innerText = "网络连接异常";
+                tagEl.innerText = "无法连接到身份验证网关";
+                isIpAllowed = false;
             }
         }
 
-        // ================= 身份验证逻辑 =================
+        // ================= 身份验证增强逻辑 =================
 
         async function openAuthModal() {
             openModal('authModal');
             if (!isLogin) {
-                await verifyDeviceIP(); // 每次打开登录框都重新校验一次 IP
+                await verifyDeviceIP(); // 唤起登录框时强制实时校验IP
             }
         }
 
         async function handleEmailLogin() {
-            // 物理防线：再次校验 IP 标记
+            // 登录前的最后一道防线：再次检查 isIpAllowed 标记
             if (!isIpAllowed) {
-                alert("登录失败：系统监测到您当前未连接到山东第二医科大学校园网 (172.22.x.x)！");
+                alert("安全警告：您的 IP 不在 172.22.x.x 范围内，无法进行云连接操作！");
                 return;
             }
 
             const email = document.getElementById('emailInput').value.trim();
             const btn = document.getElementById('sendEmailBtn');
-            if (!email || !email.includes('@')) return alert("请输入正确邮箱");
+            if (!email || !email.includes('@')) return alert("请输入正确的学校邮箱地址");
 
             btn.disabled = true;
             let timer = 60;
             const interval = setInterval(() => {
-                btn.innerText = `等待 ${timer}s`;
-                if (timer <= 0) { clearInterval(interval); btn.disabled = false; btn.innerText = "重新获取"; }
+                btn.innerText = `重新获取(${timer}s)`;
+                if (timer <= 0) { clearInterval(interval); btn.disabled = false; btn.innerText = "发送验证码"; }
                 timer--;
             }, 1000);
 
@@ -269,11 +270,11 @@
                 btn.disabled = false;
             } else {
                 document.getElementById('verifyArea').style.display = 'block';
-                alert("验证码已发！若在校园网环境下请查收邮件。");
+                alert("验证码已发送至您的邮箱，请查收！");
             }
         }
 
-        // ================= 其余原有功能代码（未缩减） =================
+        // ================= 业务核心功能代码（完整保留） =================
 
         async function checkSession() {
             const { data: { session } } = await _supabase.auth.getSession();
@@ -288,7 +289,7 @@
             isLogin = loggedIn;
             const btn = document.getElementById('loginBtn');
             if (loggedIn) {
-                btn.innerText = "✅ 已登录"; btn.style.background = "#dcfce7";
+                btn.innerText = "✅ 已连接云端"; btn.style.background = "#dcfce7";
                 document.getElementById('loginFormArea').style.display = 'none';
                 document.getElementById('userInfoArea').style.display = 'block';
                 document.getElementById('displayUserEmail').innerText = email;
@@ -303,12 +304,12 @@
             const email = document.getElementById('emailInput').value.trim();
             const code = document.getElementById('codeInput').value.trim();
             const { error } = await _supabase.auth.verifyOtp({ email, token: code, type: 'magiclink' });
-            if (error) alert("验证失败: " + error.message);
-            else alert("✅ 登录成功！");
+            if (error) alert("验证码无效或已过期: " + error.message);
+            else alert("✅ 身份验证成功！");
         }
 
         async function handleLogout() {
-            if(confirm("确定退出？")) { await _supabase.auth.signOut(); location.reload(); }
+            if(confirm("确定断开云端连接并退出？")) { await _supabase.auth.signOut(); location.reload(); }
         }
 
         function handleSearch() {
@@ -320,7 +321,7 @@
         }
 
         function showDetail(type, index) {
-            if (!isLogin) { alert("🔐 请先建立云连接验证身份"); openAuthModal(); return; }
+            if (!isLogin) { alert("🔐 为了校园安全，查看联系方式需要先建立云连接"); openAuthModal(); return; }
             const item = globalData[type][index];
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
             const isMyPost = myPosts.includes(item.id);
@@ -330,28 +331,27 @@
                 <div style="padding:10px 0">
                     <h2 style="color:var(--primary)">${item.name || item.route || item.title}</h2>
                     <div style="background:#f9fafb; padding:15px; border-radius:12px; margin:15px 0">
-                        <p><b>📱 联系：</b>${item.contact}</p>
-                        ${item.price ? `<p><b>💰 价格：</b><span class="price">¥${item.price}</span></p>` : ''}
-                        ${item.time ? `<p><b>⏰ 时间：</b>${item.time}</p>` : ''}
-                        ${item.pay ? `<p><b>💎 待遇：</b>${item.pay}</p>` : ''}
+                        <p><b>📱 联系方式：</b>${item.contact}</p>
+                        ${item.price ? `<p><b>💰 意向价格：</b><span class="price">¥${item.price}</span></p>` : ''}
+                        ${item.time ? `<p><b>⏰ 行程时间：</b>${item.time}</p>` : ''}
+                        ${item.pay ? `<p><b>💎 岗位待遇：</b>${item.pay}</p>` : ''}
                     </div>
                     ${item.desc ? `<p style="white-space:pre-wrap; border-left:4px solid #ddd; padding-left:10px">${item.desc}</p>` : ''}
-                    ${item.qr ? `<div style="text-align:center;margin-top:10px"><img src="${item.qr}" style="width:150px"></div>` : ''}
                 </div>
-                ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除发布</button>` : ''}
+                ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除我发布的这条信息</button>` : ''}
             `;
             openModal('detailModal');
         }
 
         async function deletePost(id, type) {
-            if(confirm("确定删除？")) {
+            if(confirm("确定永久删除此条发布吗？")) {
                 await _supabase.from(type).delete().eq('id', id);
-                location.reload();
+                alert("已成功删除"); location.reload();
             }
         }
 
         async function submit(type) {
-            if(!isLogin) return alert("请先建立连接！");
+            if(!isLogin) return alert("请先通过校内身份验证！");
             const btn = event.target;
             btn.disabled = true; btn.innerText = "发布中...";
             try {
@@ -371,8 +371,8 @@
                 const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
                 myPosts.push(data[0].id);
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
-                alert("发布成功"); location.reload();
-            } catch (e) { alert("失败: " + e.message); btn.disabled = false; }
+                alert("发布成功！"); location.reload();
+            } catch (e) { alert("发布失败，请检查网络: " + e.message); btn.disabled = false; btn.innerText = "确认发布"; }
         }
 
         function handleImgs(input, preId, key) {
@@ -402,6 +402,7 @@
 
         function render(id, list, type) {
             const container = document.getElementById(id);
+            if(list.length === 0) { container.innerHTML = '<p style="color:#999; padding:20px;">暂无发布内容...</p>'; return; }
             container.innerHTML = list.map((item, index) => `
                 <div class="card" onclick="showDetail('${type}', ${index})">
                     <img src="${(item.images&&item.images[0])||PLACEHOLDER}" class="card-img">
@@ -413,7 +414,6 @@
                 </div>`).join('');
         }
 
-        function getSafeImg(imgData) { return (Array.isArray(imgData) && imgData.length > 0) ? imgData[0] : PLACEHOLDER; }
         function viewImage(url) { document.getElementById('viewedImg').src = url; document.getElementById('imgViewer').style.display = 'flex'; }
         function switchSection(id) {
             document.querySelectorAll('.content-section, .nav-link').forEach(el => el.classList.remove('active'));
@@ -423,7 +423,12 @@
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
 
-        window.onload = async () => { await checkSession(); await load(); };
+        window.onload = async () => { 
+            await checkSession(); 
+            await load(); 
+            // 页面加载即进行一次隐形校验
+            await verifyDeviceIP();
+        };
     </script>
 </body>
 </html>
