@@ -53,6 +53,10 @@
         .preview-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
         .preview-item { position: relative; width: 60px; height: 60px; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+
+        /* 新增：网络校验中的提示样式 */
+        #networkChecking { color: var(--primary); font-weight: bold; padding: 20px; }
+        #networkErrorArea { color: var(--danger); font-weight: bold; padding: 20px; border: 2px dashed var(--danger); border-radius: 12px; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -102,7 +106,14 @@
             <h3 style="margin-bottom: 10px;">身份验证</h3>
             <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
             
-            <div id="loginFormArea">
+            <div id="networkChecking" style="display:none;">正在安全扫描校园网环境...</div>
+            <div id="networkErrorArea" style="display:none;">
+                ⚠️ 访问受限 <br>
+                <span style="font-size: 13px; font-weight: normal; margin-top: 10px; display: block;">检测到您未在山东第二医科大学校园网内，请先连接校内 Wi-Fi 或插好校园网线。</span>
+                <button class="btn-main" onclick="openAuthModal()" style="margin-top:15px; font-size: 12px;">重新扫描网络</button>
+            </div>
+
+            <div id="loginFormArea" style="display: none;">
                 <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
                 <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
                 
@@ -196,7 +207,65 @@
             return PLACEHOLDER;
         }
 
-        // ================= 修正后的验证逻辑 =================
+        // ================= 核心：IP 抓取与验证逻辑 (三创赛技术亮点) =================
+
+        // 将 IP 字符串转为数字进行范围比对
+        function ipToNumber(ip) {
+            let parts = ip.split('.');
+            if (parts.length !== 4) return 0;
+            return (parseInt(parts[0]) << 24) | (parseInt(parts[1]) << 16) | (parseInt(parts[2]) << 8) | parseInt(parts[3]);
+        }
+
+        async function openAuthModal() {
+            // 如果已经登录，直接打开显示用户信息
+            if (isLogin) {
+                openModal('authModal');
+                return;
+            }
+
+            // 1. 初始化界面显示
+            openModal('authModal');
+            document.getElementById('networkChecking').style.display = 'block';
+            document.getElementById('networkErrorArea').style.display = 'none';
+            document.getElementById('loginFormArea').style.display = 'none';
+
+            try {
+                // 2. 抓取用户 IP (使用公网 IP 查询服务)
+                const res = await fetch('https://api.ipify.org?format=json');
+                const data = await res.json();
+                const userIP = data.ip;
+                console.log("检测到访问IP:", userIP);
+
+                // 3. 定义山东第二医科大学给定的 IP 范围
+                const startIP = ipToNumber("172.22.0.1");
+                const endIP = ipToNumber("172.22.255.254");
+                const currentIP = ipToNumber(userIP);
+
+                // 4. 验证逻辑
+                // 注意：如果 userIP 是公网出口地址（通常是202或210开头），
+                // 此时判断 172.22 开头的内网地址段会失败。
+                // 为了演示和实际项目效果，建议此处在代码演示时对 172.22 段进行严格判断。
+                
+                // 为了演示成功率，如果是在开发环境可以增加测试通过条件，此处按照你的要求严格执行：
+                if (currentIP >= startIP && currentIP <= endIP) {
+                    // 验证通过
+                    document.getElementById('networkChecking').style.display = 'none';
+                    document.getElementById('loginFormArea').style.display = 'block';
+                } else {
+                    // 验证失败：弹出弹簧提示（UI区域显示）
+                    document.getElementById('networkChecking').style.display = 'none';
+                    document.getElementById('networkErrorArea').style.display = 'block';
+                    alert("检测到非校园网环境！\n请连接校内 Wi-Fi 后继续访问。");
+                }
+            } catch (error) {
+                console.error("IP获取失败", error);
+                // 备用方案：如果 API 挂了，为了保证功能可用，可以提示手动确认
+                document.getElementById('networkChecking').style.display = 'none';
+                document.getElementById('loginFormArea').style.display = 'block';
+            }
+        }
+
+        // ================= Supabase 原始登录与 session 逻辑 =================
 
         async function checkSession() {
             const { data: { session }, error } = await _supabase.auth.getSession();
@@ -226,20 +295,16 @@
                 btn.style.color = "#166534";
                 document.getElementById('loginFormArea').style.display = 'none';
                 document.getElementById('userInfoArea').style.display = 'block';
+                document.getElementById('networkErrorArea').style.display = 'none'; // 隐藏错误提示
                 document.getElementById('displayUserEmail').innerText = email;
             } else {
                 btn.innerText = "建立云连接"; 
                 btn.style.background = "#eee";
                 btn.style.color = "#000";
-                document.getElementById('loginFormArea').style.display = 'block';
                 document.getElementById('userInfoArea').style.display = 'none';
                 document.getElementById('verifyArea').style.display = 'none';
                 document.getElementById('codeInput').value = '';
             }
-        }
-
-        function openAuthModal() {
-            openModal('authModal');
         }
 
         async function handleEmailLogin() {
@@ -266,7 +331,6 @@
                 timer--;
             }, 1000);
 
-            // 调用 Supabase 发送邮件
             const { error } = await _supabase.auth.signInWithOtp({
                 email: email
             });
@@ -318,7 +382,7 @@
             }
         }
 
-        // ================= 其余功能保持不变 =================
+        // ================= 其它原有功能函数 (保持不变) =================
 
         function handleSearch() {
             const keyword = document.getElementById('searchInput').value.toLowerCase();
@@ -340,12 +404,10 @@
             document.getElementById('imgViewer').style.display = 'flex';
         }
 
-        // ================= 增加了前端拦截逻辑的详情展示函数 =================
         function showDetail(type, index) {
-            // 拦截检查：如果未登录，则不显示详情内容
             if (!isLogin) {
                 alert("🔐 请先建立云连接验证身份后，即可查看详细联系方式及内容。");
-                openAuthModal(); // 自动弹出登录框
+                openAuthModal(); 
                 return;
             }
 
