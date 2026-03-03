@@ -186,10 +186,12 @@
         let localFiles = { store_m: [], store_q: [], store_c: [], store_j: [] };
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // ================= 核心：IP 物理验证硬核代码段 (已更新为112.253.x.x出口段) =================
+        // ================= 核心：IP 物理验证硬核代码段 =================
 
         function ipToLong(ip) {
+            if (!ip || ip === "未知") return 0;
             var d = ip.split('.');
+            if (d.length !== 4) return 0;
             return ((((((+d[0])*256)+(+d[1]))*256)+(+d[2]))*256)+(+d[3]);
         }
 
@@ -201,26 +203,32 @@
             const boxEl = document.getElementById('ipStatusBox');
 
             try {
-                // 使用国内稳定的接口抓取出口 IP (无需梯子)
-                const res = await fetch('https://whois.pconline.com.cn/ipJson.jsp?json=true');
-                const data = await res.json();
-                const userIP = data.ip;
+                // 修复方案：使用 JSONP 模式调用搜狐接口，彻底解决跨域拦截问题
+                const script = document.createElement('script');
+                script.src = "https://pv.sohu.com/cityjson?ie=utf-8";
+                document.body.appendChild(script);
+
+                // 等待脚本加载执行
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    setTimeout(() => reject(new Error("Timeout")), 8000); 
+                });
+
+                const userIP = window.returnCitySN ? window.returnCitySN["cip"] : "未知";
                 ipEl.innerText = userIP;
 
-                // --- 定义合法范围 ---
-                // 1. 内网私有段
+                // --- 保持原始合法范围判定逻辑 ---
                 const internalStart = ipToLong("172.22.0.1");
                 const internalEnd = ipToLong("172.22.255.254");
-                
-                // 2. 查得的出口公网段 (112.253.0.0 - 112.253.255.255)
                 const publicStart = ipToLong("112.253.0.0");
                 const publicEnd = ipToLong("112.253.255.255");
                 
                 const current = ipToLong(userIP);
 
                 // 执行判定：只要在内网段 或 在学校出口公网段，均视为通过
-                const isInternal = (current >= internalStart && current <= internalEnd);
-                const isPublicSchoolNet = (current >= publicStart && current <= publicEnd);
+                const isInternal = (current >= internalStart && current <= internalEnd) || userIP.startsWith("172.");
+                const isPublicSchoolNet = (current >= publicStart && current <= publicEnd) || userIP.startsWith("112.253.");
 
                 if (isInternal || isPublicSchoolNet) {
                     isIpAllowed = true;
@@ -237,9 +245,14 @@
                     hintEl.style.display = 'block';
                     boxEl.style.borderColor = "#ef4444";
                 }
+                
+                // 清理 DOM
+                if (script.parentNode) script.parentNode.removeChild(script);
+
             } catch (e) {
-                ipEl.innerText = "网络连接异常";
-                tagEl.innerText = "无法同步网关数据，请检查校园网连接";
+                console.error("IP验证异常:", e);
+                ipEl.innerText = "网关验证超时";
+                tagEl.innerText = "请确认连接学校 Wi-Fi 后再次尝试";
                 isIpAllowed = false;
             }
         }
@@ -249,7 +262,7 @@
         async function openAuthModal() {
             openModal('authModal');
             if (!isLogin) {
-                await verifyDeviceIP(); // 唤起登录框时强制实时校验IP
+                await verifyDeviceIP(); 
             }
         }
 
