@@ -54,13 +54,13 @@
         .preview-item { position: relative; width: 60px; height: 60px; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
 
-        /* 新增样式：管理员入口 */
+        /* 管理员入口 */
         .admin-entry { margin-top: 30px; padding-top: 20px; border-top: 1px dashed #eee; }
         .admin-entry p { font-size: 12px; color: #bbb; cursor: pointer; }
         #adminBox { display: none; margin-top: 10px; }
         .ip-tip { font-size: 12px; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
         .ip-success { background: #f0fdf4; color: #166534; }
-        .ip-fail { background: #fef2f2; color: #991b1b; }
+        .ip-fail { background: #fff7ed; color: #9a3412; border: 1px solid #ffedd5; }
     </style>
 </head>
 <body>
@@ -111,7 +111,7 @@
             
             <div id="ipStatus" class="ip-tip">正在检测接入环境...</div>
             
-            <div id="loginFormArea" style="display: none;">
+            <div id="loginFormArea">
                 <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
                 <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
                 <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
@@ -121,7 +121,7 @@
                     <input type="text" id="codeInput" placeholder="输入数字" style="text-align:center; letter-spacing: 5px; font-size: 1.2rem; font-weight: bold;">
                     <button class="btn-main" onclick="handleVerifyCode()" style="width:100%; margin-top:10px; background: var(--secondary);">确认并在本页登录</button>
                 </div>
-                <p style="font-size: 11px; color: #999; margin-top: 15px;">提示：请不要关闭此页面，去邮箱查看验证码后返回这里输入。</p>
+                <p style="font-size: 11px; color: #999; margin-top: 15px;">提示：请不要关闭此页面，查看验证码后返回这里输入。</p>
             </div>
 
             <div id="userInfoArea" style="display: none;">
@@ -156,12 +156,10 @@
             <input type="text" id="m_t" placeholder="商品名称">
             <input type="number" id="m_p" placeholder="价格 (¥)">
             <input type="text" id="m_c" placeholder="联系微信号">
-            <label>上传实物图（多选）：</label>
+            <label>上传实物图及收款码（可多选）：</label>
             <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')">
             <div class="preview-grid" id="pre_m"></div>
-            <label>收款码(可选)：</label>
-            <input type="file" accept="image/*" onchange="handleImgs(this, 'pre_q', 'store_q')">
-            <div class="preview-grid" id="pre_q"></div>
+            <p style="font-size: 11px; color: #999; margin-bottom: 10px;">* 为了方便交易，建议最后一张图片上传收款码</p>
             <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button>
         </div>
     </div>
@@ -196,56 +194,47 @@
     </div>
 
     <script>
-        // 初始化 Supabase
         const SUPABASE_URL = 'https://xhcqqnpzyafvjsxyndya.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_gsBzkYayDH3Z3jbEENOLrA__a7tf2TA';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let isLogin = false;
         let globalData = { Market: [], Carpool: [], Job: [] };
-        let localFiles = { store_m: [], store_q: [], store_c: [], store_j: [] };
+        let localFiles = { store_m: [], store_c: [], store_j: [] };
 
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // ================= 新增：IP 校验与管理员逻辑 =================
-
+        // 获取IP
         async function getIP() {
             try {
                 const response = await fetch('https://api.ipify.org?format=json');
                 const data = await response.json();
                 return data.ip;
-            } catch (e) {
-                return null;
-            }
+            } catch (e) { return null; }
         }
 
+        // IP范围判断
         function isIPInRange(ip) {
             if(!ip) return false;
             const parts = ip.split('.').map(Number);
-            // 判断是否在 112.253.0.0 ~ 112.253.255.255
             return parts[0] === 112 && parts[1] === 253;
         }
 
+        // 打开验证窗口并检测IP
         async function openAuthModal() {
             openModal('authModal');
-            if (isLogin) return; // 已登录不需要校验IP
+            if (isLogin) return;
 
             const statusBox = document.getElementById('ipStatus');
-            const formArea = document.getElementById('loginFormArea');
+            const userIP = await getIP();
             
             statusBox.className = "ip-tip";
-            statusBox.innerText = "正在安全检测...";
-            formArea.style.display = 'none';
-
-            const userIP = await getIP();
             if (isIPInRange(userIP)) {
-                statusBox.innerText = `检测到受信任 IP: ${userIP}，已开放验证。`;
+                statusBox.innerText = `当前接入IP: ${userIP}\n(校内网段，已自动授信)`;
                 statusBox.classList.add('ip-success');
-                formArea.style.display = 'block';
             } else {
-                statusBox.innerText = `当前 IP (${userIP || '未知'}) 不在授权校园网段内，无法进行邮箱验证。`;
+                statusBox.innerText = `⚠️ 警告：当前IP ${userIP || '未知'} 不在校内授权段内。如遇连接问题请尝试切换至校园Wifi。`;
                 statusBox.classList.add('ip-fail');
-                formArea.style.display = 'none';
             }
         }
 
@@ -255,17 +244,13 @@
                 alert("管理员调试模式已开启");
                 updateLoginState(true, "Admin_Debug_Mode");
                 closeModal();
-            } else {
-                alert("调试码错误");
-            }
+            } else { alert("调试码错误"); }
         }
 
-        // ================= 优化：图片预览（防止卡顿） =================
-
+        // 图片处理
         function handleImgs(input, preId, key) {
             Array.from(input.files).forEach(f => {
                 localFiles[key].push(f);
-                // 优化点：使用 createObjectURL 代替 FileReader，减少内存占用，防止UI卡顿
                 const imgUrl = URL.createObjectURL(f);
                 const div = document.createElement('div');
                 div.className = 'preview-item';
@@ -273,26 +258,17 @@
                 div.onclick = () => { 
                     div.remove(); 
                     localFiles[key] = localFiles[key].filter(file => file !== f); 
-                    URL.revokeObjectURL(imgUrl); // 释放内存
+                    URL.revokeObjectURL(imgUrl); 
                 };
                 document.getElementById(preId).appendChild(div);
             });
             input.value = '';
         }
 
-        // ================= 以下原始功能逻辑保留，仅做必要调用更新 =================
-
-        function getSafeImg(imgData) {
-            if (Array.isArray(imgData) && imgData.length > 0) return imgData[0];
-            if (typeof imgData === 'string' && imgData.startsWith('http')) return imgData;
-            return PLACEHOLDER;
-        }
-
+        // Supabase 功能模块
         async function checkSession() {
             const { data: { session } } = await _supabase.auth.getSession();
-            if (session) {
-                updateLoginState(true, session.user.email);
-            }
+            if (session) updateLoginState(true, session.user.email);
 
             _supabase.auth.onAuthStateChange((event, session) => {
                 if (event === 'SIGNED_IN' && session) {
@@ -311,12 +287,12 @@
                 btn.innerText = "✅ 已连接"; 
                 btn.style.background = "#dcfce7";
                 document.getElementById('loginFormArea').style.display = 'none';
-                document.getElementById('ipStatus').style.display = 'none';
                 document.getElementById('userInfoArea').style.display = 'block';
                 document.getElementById('displayUserEmail').innerText = email;
             } else {
                 btn.innerText = "建立云连接"; 
                 btn.style.background = "#eee";
+                document.getElementById('loginFormArea').style.display = 'block';
                 document.getElementById('userInfoArea').style.display = 'none';
             }
         }
@@ -326,11 +302,11 @@
             const btn = document.getElementById('sendEmailBtn');
             if (!email || !email.includes('@')) return alert("请输入正确的邮箱");
 
-            btn.disabled = true;
+            btn.disabled = true; btn.innerText = "发送中...";
             const { error } = await _supabase.auth.signInWithOtp({ email: email });
             if (error) {
                 alert("发送失败: " + error.message);
-                btn.disabled = false;
+                btn.disabled = false; btn.innerText = "发送验证码";
             } else {
                 document.getElementById('verifyArea').style.display = 'block';
                 alert("验证码已发送至邮箱！");
@@ -360,12 +336,6 @@
                 return title.includes(keyword);
             });
             render(currentTab + 'List', filtered, type);
-        }
-
-        function viewImage(url) {
-            if(!url || url === PLACEHOLDER) return;
-            document.getElementById('viewedImg').src = url;
-            document.getElementById('imgViewer').style.display = 'flex';
         }
 
         function showDetail(type, index) {
@@ -467,6 +437,17 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        function getSafeImg(imgData) {
+            if (Array.isArray(imgData) && imgData.length > 0) return imgData[0];
+            return PLACEHOLDER;
+        }
+
+        function viewImage(url) {
+            if(!url || url === PLACEHOLDER) return;
+            document.getElementById('viewedImg').src = url;
+            document.getElementById('imgViewer').style.display = 'flex';
         }
 
         function switchSection(id) {
