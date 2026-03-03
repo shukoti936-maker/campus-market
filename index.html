@@ -60,7 +60,7 @@
         #adminBox { display: none; margin-top: 10px; }
         .ip-tip { font-size: 12px; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
         .ip-success { background: #f0fdf4; color: #166534; }
-        .ip-fail { background: #fff7ed; color: #9a3412; border: 1px solid #ffedd5; }
+        .ip-fail { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
     </style>
 </head>
 <body>
@@ -113,15 +113,17 @@
             
             <div id="loginFormArea">
                 <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
-                <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
-                <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
+                <div id="emailBox">
+                    <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
+                    <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
+                </div>
                 
                 <div id="verifyArea" style="display: none; margin-top: 15px; background: #f9fafb; padding: 15px; border-radius: 8px;">
                     <label style="display: block; text-align: left; margin-bottom: 5px;">请输入邮箱收到的验证码：</label>
                     <input type="text" id="codeInput" placeholder="输入数字" style="text-align:center; letter-spacing: 5px; font-size: 1.2rem; font-weight: bold;">
                     <button class="btn-main" onclick="handleVerifyCode()" style="width:100%; margin-top:10px; background: var(--secondary);">确认并在本页登录</button>
                 </div>
-                <p style="font-size: 11px; color: #999; margin-top: 15px;">提示：请不要关闭此页面，查看验证码后返回这里输入。</p>
+                <p id="ipNotice" style="font-size: 11px; color: #999; margin-top: 15px;">提示：请不要关闭此页面，查看验证码后返回这里输入。</p>
             </div>
 
             <div id="userInfoArea" style="display: none;">
@@ -136,7 +138,7 @@
                 <p onclick="document.getElementById('adminBox').style.display='block'">⊙ 管理员调试入口</p>
                 <div id="adminBox">
                     <input type="password" id="adminPwd" maxlength="6" placeholder="输入6位调试码" style="text-align:center; font-size:14px; padding:8px;">
-                    <button onclick="adminLogin()" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; width:100%; cursor:pointer;">进入调试模式</button>
+                    <button onclick="adminLogin()" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; width:100%; cursor:pointer;">验证并直接登录</button>
                 </div>
             </div>
         </div>
@@ -199,6 +201,7 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let isLogin = false;
+        let isAdmin = false; // 增加管理员标识
         let globalData = { Market: [], Carpool: [], Job: [] };
         let localFiles = { store_m: [], store_c: [], store_j: [] };
 
@@ -226,25 +229,34 @@
             if (isLogin) return;
 
             const statusBox = document.getElementById('ipStatus');
+            const emailBox = document.getElementById('emailBox');
             const userIP = await getIP();
             
             statusBox.className = "ip-tip";
             if (isIPInRange(userIP)) {
                 statusBox.innerText = `当前接入IP: ${userIP}\n(校内网段，已自动授信)`;
                 statusBox.classList.add('ip-success');
+                emailBox.style.display = 'block'; // 校内IP允许显示邮箱登录
+                document.getElementById('ipNotice').innerText = "提示：请不要关闭此页面，查看验证码后返回这里输入。";
             } else {
-                statusBox.innerText = `⚠️ 警告：当前IP ${userIP || '未知'} 不在校内授权段内。如遇连接问题请尝试切换至校园Wifi。`;
+                statusBox.innerText = `🚫 接入受限：当前IP ${userIP || '未知'} 不在校内授权段内。邮箱登录已禁用，请连接校园网或使用管理员模式。`;
                 statusBox.classList.add('ip-fail');
+                emailBox.style.display = 'none'; // 非校内IP禁止邮箱登录
+                document.getElementById('ipNotice').innerText = "由于安全限制，非校内网络环境仅限管理员调试登录。";
             }
         }
 
+        // 管理员登录：验证密码正确后直接授权，无需邮箱
         function adminLogin() {
             const pwd = document.getElementById('adminPwd').value;
             if (pwd === "051218") {
-                alert("管理员调试模式已开启");
-                updateLoginState(true, "Admin_Debug_Mode");
+                isAdmin = true;
+                updateLoginState(true, "Administrator_Debug");
+                alert("管理员授权成功！");
                 closeModal();
-            } else { alert("调试码错误"); }
+            } else { 
+                alert("调试码错误，授权失败"); 
+            }
         }
 
         // 图片处理
@@ -322,6 +334,7 @@
 
         async function handleLogout() {
             if(confirm("确定退出？")) {
+                isAdmin = false;
                 await _supabase.auth.signOut();
                 location.reload();
             }
@@ -347,7 +360,7 @@
             const item = globalData[type][index];
             const content = document.getElementById('detailContent');
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
-            const isMyPost = myPosts.includes(item.id);
+            const isMyPost = myPosts.includes(item.id) || isAdmin; // 管理员可删除任意
             const images = Array.isArray(item.images) ? item.images : [];
 
             content.innerHTML = `
