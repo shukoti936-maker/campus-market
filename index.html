@@ -53,12 +53,6 @@
         .preview-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
         .preview-item { position: relative; width: 60px; height: 60px; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-
-        /* 新增：管理员区域样式 */
-        .admin-bypass-area { margin-top: 25px; padding-top: 15px; border-top: 1px dashed #ddd; }
-        .ip-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-top: 5px; display: inline-block; }
-        .ip-valid { background: #dcfce7; color: #166534; }
-        .ip-invalid { background: #fee2e2; color: #991b1b; }
     </style>
 </head>
 <body>
@@ -106,8 +100,9 @@
         <div class="modal-content" style="text-align:center;">
             <div class="close-btn" onclick="closeModal()">×</div>
             <h3 style="margin-bottom: 10px;">身份验证</h3>
-            <p style="font-size: 12px; color: #666; margin-bottom: 5px;">物理安全校验：仅限校内网段访问</p>
-            <div id="ipStatusDisplay"></div> <div id="loginFormArea" style="margin-top: 20px;">
+            <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
+            
+            <div id="loginFormArea">
                 <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
                 <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
                 
@@ -118,16 +113,6 @@
                 </div>
 
                 <p style="font-size: 11px; color: #999; margin-top: 15px;">提示：请不要关闭此页面，去邮箱查看验证码后返回这里输入。</p>
-
-                <div class="admin-bypass-area">
-                    <details>
-                        <summary style="font-size: 11px; color: #ccc; cursor: pointer; list-style: none;">[ 管理员调试入口 ]</summary>
-                        <div style="margin-top: 10px; background: #f3f4f6; padding: 10px; border-radius: 8px;">
-                            <input type="password" id="adminPwdInput" placeholder="请输入6位管理码" maxlength="6" style="font-size: 14px; padding: 8px;">
-                            <button onclick="validateAdmin()" style="width: 100%; background: #374151; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px;">验证并解锁权限</button>
-                        </div>
-                    </details>
-                </div>
             </div>
 
             <div id="userInfoArea" style="display: none;">
@@ -140,12 +125,61 @@
         </div>
     </div>
 
-    <div id="detailModal" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><div id="detailContent"></div></div></div>
-    <div id="pubMarket" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布二手商品</h3><input type="text" id="m_t" placeholder="商品名称"><input type="number" id="m_p" placeholder="价格 (¥)"><input type="text" id="m_c" placeholder="联系微信号"><label>上传实物图：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')"><div class="preview-grid" id="pre_m"></div><label>收款码(可选)：</label><input type="file" accept="image/*" onchange="handleImgs(this, 'pre_q', 'store_q')"><div class="preview-grid" id="pre_q"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button></div></div>
-    <div id="pubCarpool" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布拼车行程</h3><input type="text" id="c_t" placeholder="出发地 - 目的地"><input type="text" id="c_time" placeholder="出发时间"><input type="text" id="c_c" placeholder="联系微信号"><label>行程相关图：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_c', 'store_c')"><div class="preview-grid" id="pre_c"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Carpool')">确认发布</button></div></div>
-    <div id="pubJob" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布兼职招聘</h3><input type="text" id="j_t" placeholder="岗位名称"><input type="text" id="j_p" placeholder="薪资/待遇"><textarea id="j_d" placeholder="工作内容" rows="4"></textarea><input type="text" id="j_c" placeholder="联系人方式"><label>海报/环境图：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_j', 'store_j')"><div class="preview-grid" id="pre_j"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Job')">确认发布</button></div></div>
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+
+    <div id="pubMarket" class="modal">
+        <div class="modal-content">
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <h3>发布二手商品</h3>
+            <input type="text" id="m_t" placeholder="商品名称">
+            <input type="number" id="m_p" placeholder="价格 (¥)">
+            <input type="text" id="m_c" placeholder="联系微信号">
+            <label>上传实物图（多选）：</label>
+            <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')">
+            <div class="preview-grid" id="pre_m"></div>
+            <label>收款码(可选)：</label>
+            <input type="file" accept="image/*" onchange="handleImgs(this, 'pre_q', 'store_q')">
+            <div class="preview-grid" id="pre_q"></div>
+            <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button>
+        </div>
+    </div>
+
+    <div id="pubCarpool" class="modal">
+        <div class="modal-content">
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <h3>发布拼车行程</h3>
+            <input type="text" id="c_t" placeholder="出发地 - 目的地">
+            <input type="text" id="c_time" placeholder="出发时间（如：明日下午2点）">
+            <input type="text" id="c_c" placeholder="联系微信号/手机号">
+            <label>行程相关图：</label>
+            <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_c', 'store_c')">
+            <div class="preview-grid" id="pre_c"></div>
+            <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Carpool')">确认发布</button>
+        </div>
+    </div>
+
+    <div id="pubJob" class="modal">
+        <div class="modal-content">
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <h3>发布兼职招聘</h3>
+            <input type="text" id="j_t" placeholder="岗位名称">
+            <input type="text" id="j_p" placeholder="薪资/待遇（如：200/天）">
+            <textarea id="j_d" placeholder="工作内容及要求" rows="4"></textarea>
+            <input type="text" id="j_c" placeholder="联系人及联系方式">
+            <label>海报/环境图：</label>
+            <input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_j', 'store_j')">
+            <div class="preview-grid" id="pre_j"></div>
+            <button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Job')">确认发布</button>
+        </div>
+    </div>
 
     <script>
+        // 初始化 Supabase
         const SUPABASE_URL = 'https://xhcqqnpzyafvjsxyndya.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_gsBzkYayDH3Z3jbEENOLrA__a7tf2TA';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -153,63 +187,29 @@
         let isLogin = false;
         let globalData = { Market: [], Carpool: [], Job: [] };
         let localFiles = { store_m: [], store_q: [], store_c: [], store_j: [] };
+
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // ================= 新增：IP验证逻辑 =================
-        let userIP = "";
-        let isAdminMode = false;
-
-        async function fetchUserIP() {
-            try {
-                const res = await fetch('https://api.ipify.org?format=json');
-                const data = await res.json();
-                userIP = data.ip;
-                updateIPUI();
-            } catch (e) {
-                console.error("IP获取失败", e);
-                document.getElementById('ipStatusDisplay').innerHTML = `<span class="ip-tag ip-invalid">无法识别当前网络环境</span>`;
-            }
+        function getSafeImg(imgData) {
+            if (Array.isArray(imgData) && imgData.length > 0) return imgData[0];
+            if (typeof imgData === 'string' && imgData.startsWith('http')) return imgData;
+            return PLACEHOLDER;
         }
 
-        function checkIPAccess() {
-            if (isAdminMode) return true; // 管理员模式直接放行
-            if (!userIP) return false;
-            const parts = userIP.split('.');
-            // 匹配 112.253.x.x
-            return parts[0] === '112' && parts[1] === '253';
-        }
-
-        function updateIPUI() {
-            const display = document.getElementById('ipStatusDisplay');
-            const isInRange = checkIPAccess();
-            display.innerHTML = `
-                <div style="font-size:11px; color:#666;">您的IP: ${userIP}</div>
-                <span class="ip-tag ${isInRange ? 'ip-valid' : 'ip-invalid'}">
-                    ${isInRange ? '● 已连接校园教育网' : '● 非校内物理网段 - 访问受限'}
-                </span>
-            `;
-        }
-
-        function validateAdmin() {
-            const pwd = document.getElementById('adminPwdInput').value;
-            if (pwd === "051218") {
-                isAdminMode = true;
-                alert("✅ 管理员身份验证成功！已解除物理网段限制。");
-                updateIPUI();
-            } else {
-                alert("❌ 密码错误，无法开启调试模式。");
-            }
-        }
-
-        // ================= 原有逻辑集成 =================
+        // ================= 修正后的验证逻辑 =================
 
         async function checkSession() {
-            const { data: { session } } = await _supabase.auth.getSession();
-            updateLoginState(!!session, session?.user?.email);
+            const { data: { session }, error } = await _supabase.auth.getSession();
+            if (session) {
+                updateLoginState(true, session.user.email);
+            } else {
+                updateLoginState(false, null);
+            }
+
             _supabase.auth.onAuthStateChange((event, session) => {
                 if (event === 'SIGNED_IN' && session) {
                     updateLoginState(true, session.user.email);
-                    closeModal();
+                    closeModal(); 
                 } else if (event === 'SIGNED_OUT') {
                     updateLoginState(false, null);
                 }
@@ -219,82 +219,119 @@
         function updateLoginState(loggedIn, email) {
             isLogin = loggedIn;
             const btn = document.getElementById('loginBtn');
+            
             if (loggedIn && email) {
-                btn.innerText = "✅ 已登录"; btn.style.background = "#dcfce7"; btn.style.color = "#166534";
+                btn.innerText = "✅ 已登录"; 
+                btn.style.background = "#dcfce7";
+                btn.style.color = "#166534";
                 document.getElementById('loginFormArea').style.display = 'none';
                 document.getElementById('userInfoArea').style.display = 'block';
                 document.getElementById('displayUserEmail').innerText = email;
             } else {
-                btn.innerText = "建立云连接"; btn.style.background = "#eee"; btn.style.color = "#000";
+                btn.innerText = "建立云连接"; 
+                btn.style.background = "#eee";
+                btn.style.color = "#000";
                 document.getElementById('loginFormArea').style.display = 'block';
                 document.getElementById('userInfoArea').style.display = 'none';
                 document.getElementById('verifyArea').style.display = 'none';
+                document.getElementById('codeInput').value = '';
             }
         }
 
-        // 修改：handleEmailLogin 增加 IP 拦截
-        async function handleEmailLogin() {
-            if (!checkIPAccess()) {
-                return alert("⚠️ 权限拦截：\n检测到您当前处于校外网段，根据安全策略，您无法进行身份验证。\n\n如您是管理员，请使用下方的调试入口。");
-            }
+        function openAuthModal() {
+            openModal('authModal');
+        }
 
+        async function handleEmailLogin() {
             const email = document.getElementById('emailInput').value.trim();
             const btn = document.getElementById('sendEmailBtn');
-            if (!email || !email.includes('@')) return alert("请输入正确的邮箱地址");
+
+            if (!email || !email.includes('@')) {
+                return alert("请输入正确的邮箱地址");
+            }
 
             btn.disabled = true;
             let timer = 60;
             const originalBg = btn.style.background;
+            btn.style.background = "#9ca3af";
+
             const interval = setInterval(() => {
                 btn.innerText = `等待 ${timer}s`;
-                if (timer-- <= 0) {
-                    clearInterval(interval); btn.disabled = false; btn.innerText = "重新获取验证码"; btn.style.background = originalBg;
+                if (timer <= 0) {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                    btn.innerText = "重新获取验证码";
+                    btn.style.background = originalBg;
                 }
+                timer--;
             }, 1000);
 
-            const { error } = await _supabase.auth.signInWithOtp({ email: email });
+            // 调用 Supabase 发送邮件
+            const { error } = await _supabase.auth.signInWithOtp({
+                email: email
+            });
+
             if (error) {
                 alert("发送失败: " + error.message);
-                clearInterval(interval); btn.disabled = false; btn.innerText = "重新发送";
+                clearInterval(interval);
+                btn.disabled = false;
+                btn.innerText = "重新发送";
+                btn.style.background = originalBg;
             } else {
                 document.getElementById('verifyArea').style.display = 'block';
-                alert("✅ 验证码已发送！请查看邮箱。");
+                alert("✅ 验证码已发送！\n请去邮箱查看验证码，并在下方输入。");
             }
         }
-
-        // ================= 以下代码保持原样，未做任何修改 =================
-
-        function getSafeImg(imgData) {
-            if (Array.isArray(imgData) && imgData.length > 0) return imgData[0];
-            if (typeof imgData === 'string' && imgData.startsWith('http')) return imgData;
-            return PLACEHOLDER;
-        }
-
-        function openAuthModal() { openModal('authModal'); }
 
         async function handleVerifyCode() {
             const email = document.getElementById('emailInput').value.trim();
             const code = document.getElementById('codeInput').value.trim();
             const btn = event.target;
-            if (!code) return alert("请输入验证码");
+
+            if (!code) {
+                return alert("请输入验证码");
+            }
+
             const originalText = btn.innerText;
-            btn.innerText = "正在验证..."; btn.disabled = true;
-            const { error } = await _supabase.auth.verifyOtp({ email: email, token: code, type: 'magiclink' });
-            if (error) { alert("验证失败: " + error.message); btn.disabled = false; btn.innerText = originalText; }
-            else { alert("✅ 登录成功！"); }
+            btn.innerText = "正在验证...";
+            btn.disabled = true;
+
+            const { data, error } = await _supabase.auth.verifyOtp({
+                email: email,
+                token: code,
+                type: 'magiclink' 
+            });
+
+            if (error) {
+                alert("验证失败: " + error.message);
+                btn.disabled = false;
+                btn.innerText = originalText;
+            } else {
+                alert("✅ 登录成功！");
+            }
         }
 
         async function handleLogout() {
-            if(confirm("确定要退出当前账号吗？")) { await _supabase.auth.signOut(); location.reload(); }
+            if(confirm("确定要退出当前账号吗？")) {
+                await _supabase.auth.signOut();
+                location.reload();
+            }
         }
+
+        // ================= 其余功能保持不变 =================
 
         function handleSearch() {
             const keyword = document.getElementById('searchInput').value.toLowerCase();
             const currentTab = document.querySelector('.nav-link.active').id.split('-')[1];
             const tabMap = { market: 'Market', carpool: 'Carpool', jobs: 'Job' };
             const type = tabMap[currentTab];
-            const filtered = globalData[type].filter(item => (item.name || item.route || item.title || "").toLowerCase().includes(keyword));
-            render(currentTab + 'List', filtered, type);
+            const listId = currentTab + 'List';
+            
+            const filtered = globalData[type].filter(item => {
+                const title = (item.name || item.route || item.title || "").toLowerCase();
+                return title.includes(keyword);
+            });
+            render(listId, filtered, type);
         }
 
         function viewImage(url) {
@@ -303,68 +340,109 @@
             document.getElementById('imgViewer').style.display = 'flex';
         }
 
+        // ================= 增加了前端拦截逻辑的详情展示函数 =================
         function showDetail(type, index) {
-            if (!isLogin) { alert("🔐 请先建立云连接验证身份后查看。"); openAuthModal(); return; }
+            // 拦截检查：如果未登录，则不显示详情内容
+            if (!isLogin) {
+                alert("🔐 请先建立云连接验证身份后，即可查看详细联系方式及内容。");
+                openAuthModal(); // 自动弹出登录框
+                return;
+            }
+
             const item = globalData[type][index];
             if(!item) return;
+
             const content = document.getElementById('detailContent');
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
             const isMyPost = myPosts.includes(item.id);
             const images = Array.isArray(item.images) ? item.images : [];
-            content.innerHTML = `
-                <div class="detail-gallery">${images.length > 0 ? images.map(u => `<img src="${u}" onclick="viewImage('${u}')" onerror="this.src='${PLACEHOLDER}'">`).join('') : `<img src="${PLACEHOLDER}">`}</div>
+
+            let html = `
+                <div class="detail-gallery">
+                    ${images.length > 0 ? 
+                        images.map(u => `<img src="${u}" onclick="viewImage('${u}')" onerror="this.src='${PLACEHOLDER}'">`).join('') :
+                        `<img src="${PLACEHOLDER}" style="cursor:default">`
+                    }
+                </div>
                 <div style="padding:10px 0">
                     <h2 style="color:var(--primary); margin-bottom:15px">${item.name || item.route || item.title}</h2>
                     <div style="background:#f9fafb; padding:15px; border-radius:12px; margin-bottom:15px">
-                        <p><b>📱 联系方式：</b>${item.contact || '未填写'}</p>
-                        ${item.price ? `<p><b>💰 价格：</b><span class="price">¥${item.price}</span></p>` : ''}
-                        ${item.time ? `<p><b>⏰ 时间：</b>${item.time}</p>` : ''}
-                        ${item.pay ? `<p><b>💎 待遇：</b>${item.pay}</p>` : ''}
+                        <p style="margin-bottom:8px"><b>📱 联系方式：</b><span style="color:var(--primary); font-weight:bold">${item.contact || '未填写'}</span></p>
+                        ${item.price ? `<p style="margin-bottom:8px"><b>💰 价格：</b><span class="price">¥${item.price}</span></p>` : ''}
+                        ${item.time ? `<p style="margin-bottom:8px"><b>⏰ 出发时间：</b>${item.time}</p>` : ''}
+                        ${item.pay ? `<p style="margin-bottom:8px"><b>💎 薪资待遇：</b><span style="color:var(--secondary); font-weight:bold">${item.pay}</span></p>` : ''}
                     </div>
-                    ${item.desc ? `<p style="white-space:pre-wrap; border-left:4px solid #ddd; padding-left:10px;">${item.desc}</p>` : ''}
+                    ${item.desc ? `<p style="white-space:pre-wrap; background:#fff; border-left:4px solid #ddd; padding-left:10px; margin:15px 0;">${item.desc}</p>` : ''}
+                    ${item.qr ? `<div style="text-align:center;"><img src="${item.qr}" style="width:180px;" onclick="viewImage(this.src)"></div>` : ''}
                 </div>
                 ${isMyPost ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除此条发布</button>` : ''}
             `;
+            content.innerHTML = html;
             openModal('detailModal');
         }
 
         async function deletePost(id, type) {
             if(!confirm("确定要删除吗？")) return;
-            const { error } = await _supabase.from(type).delete().eq('id', id);
-            if(error) alert("失败: " + error.message); else { alert("已删除"); location.reload(); }
+            try {
+                const { error } = await _supabase.from(type).delete().eq('id', id);
+                if(error) throw error;
+                alert("已删除");
+                location.reload();
+            } catch (e) { alert("删除失败: " + e.message); }
         }
 
         async function submit(type) {
-            if(!isLogin) return alert("请先建立连接！");
+            if(!isLogin) return alert("请先点击右上角建立连接并验证身份！");
             const btn = event.target;
             const contactVal = document.getElementById(type[0].toLowerCase()+'_c').value;
             if(!contactVal) return alert("请填写联系方式");
+
             btn.innerText = "正在发布..."; btn.disabled = true;
+
             try {
                 let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
                 const imgUrls = [];
                 for(let f of localFiles[key]) {
                     const fname = `public/${Date.now()}_${f.name.replace(/[^\x00-\x7F]/g, "")}`;
-                    await _supabase.storage.from('images').upload(fname, f);
+                    const { error } = await _supabase.storage.from('images').upload(fname, f);
+                    if(error) throw error;
                     imgUrls.push(_supabase.storage.from('images').getPublicUrl(fname).data.publicUrl);
                 }
+
                 let qrUrl = "";
                 if(type === 'Market' && localFiles.store_q.length > 0) {
                     const qname = `qr/QR_${Date.now()}.png`;
                     await _supabase.storage.from('images').upload(qname, localFiles.store_q[0]);
                     qrUrl = _supabase.storage.from('images').getPublicUrl(qname).data.publicUrl;
                 }
+
                 const payload = { images: imgUrls, contact: contactVal };
-                if(type === 'Market') { payload.name = document.getElementById('m_t').value; payload.price = document.getElementById('m_p').value; payload.qr = qrUrl; }
-                else if(type === 'Carpool') { payload.route = document.getElementById('c_t').value; payload.time = document.getElementById('c_time').value; }
-                else if(type === 'Job') { payload.title = document.getElementById('j_t').value; payload.pay = document.getElementById('j_p').value; payload.desc = document.getElementById('j_d').value; }
+                if(type === 'Market') {
+                    payload.name = document.getElementById('m_t').value || "未命名";
+                    payload.price = document.getElementById('m_p').value || "0";
+                    payload.qr = qrUrl;
+                } else if(type === 'Carpool') {
+                    payload.route = document.getElementById('c_t').value || "未定";
+                    payload.time = document.getElementById('c_time').value || "随时";
+                } else if(type === 'Job') {
+                    payload.title = document.getElementById('j_t').value || "岗位";
+                    payload.pay = document.getElementById('j_p').value || "面议";
+                    payload.desc = document.getElementById('j_d').value || "";
+                }
+
                 const { data, error } = await _supabase.from(type).insert([payload]).select();
                 if(error) throw error;
+
                 const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
                 myPosts.push(data[0].id);
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
-                alert("发布成功"); location.reload();
-            } catch (e) { alert("失败: " + e.message); btn.disabled = false; btn.innerText = "确认发布"; }
+
+                alert("发布成功");
+                location.reload();
+            } catch (e) { 
+                alert("发布失败: " + e.message); 
+                btn.disabled = false; btn.innerText = "确认发布"; 
+            }
         }
 
         function handleImgs(input, preId, key) {
@@ -384,18 +462,23 @@
         }
 
         async function load() {
-            const { data: m } = await _supabase.from('Market').select('*').order('created_at', {ascending:false});
-            const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
-            const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
-            globalData = { Market: m||[], Carpool: c||[], Job: j||[] };
-            render('marketList', globalData.Market, 'Market');
-            render('carpoolList', globalData.Carpool, 'Carpool');
-            render('jobsList', globalData.Job, 'Job');
+            try {
+                const { data: m } = await _supabase.from('Market').select('*').order('created_at', {ascending:false});
+                const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
+                const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
+                globalData = { Market: m||[], Carpool: c||[], Job: j||[] };
+                render('marketList', globalData.Market, 'Market');
+                render('carpoolList', globalData.Carpool, 'Carpool');
+                render('jobsList', globalData.Job, 'Job');
+            } catch (e) { console.log("加载失败:", e.message); }
         }
 
         function render(id, list, type) {
             const container = document.getElementById(id);
-            if(!list || list.length === 0) { container.innerHTML = `<p style="grid-column:1/-1;text-align:center;padding:40px;color:#999;">暂无内容</p>`; return; }
+            if(!list || list.length === 0) {
+                container.innerHTML = `<p style="grid-column:1/-1; text-align:center; padding:40px; color:#999;">暂无内容</p>`;
+                return;
+            }
             container.innerHTML = list.map((item, index) => `
                 <div class="card" onclick="showDetail('${type}', ${index})">
                     <img src="${getSafeImg(item.images)}" class="card-img" onerror="this.src='${PLACEHOLDER}'">
@@ -404,7 +487,8 @@
                         ${type==='Carpool' ? `<h4>${item.route}</h4><p>⏰ ${item.time}</p>` : ''}
                         ${type==='Job' ? `<div style="color:var(--secondary);font-weight:bold">${item.pay}</div><h4>${item.title}</h4>` : ''}
                     </div>
-                </div>`).join('');
+                </div>
+            `).join('');
         }
 
         function switchSection(id) {
@@ -412,11 +496,11 @@
             document.getElementById(id + 'Section').classList.add('active');
             document.getElementById('nav-' + id).classList.add('active');
         }
+        
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
         
         window.onload = async () => {
-            fetchUserIP(); // 初始化获取IP
             await checkSession();
             await load();
         };
