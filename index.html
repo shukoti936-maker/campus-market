@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 增强验证版</title>
+    <title>校园生活助手 - 安全加强版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
@@ -34,7 +34,6 @@
         .card-body { padding: 12px; }
         .price { color: var(--danger); font-size: 1.1rem; font-weight: 800; }
 
-        /* 过期标志样式 */
         .expired-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); border: 4px solid var(--danger); color: var(--danger); padding: 10px 20px; font-size: 2rem; font-weight: 900; background: rgba(255,255,255,0.9); border-radius: 10px; z-index: 5; pointer-events: none; opacity: 0.9; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
@@ -111,7 +110,7 @@
             <h3 style="margin-bottom: 10px;">身份验证</h3>
             <div id="ipStatus" class="ip-tip">正在检测接入环境...</div>
             <div id="loginFormArea">
-                <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
+                <p style="font-size: 12px; color: #666; margin-bottom: 20px;">使用校园网接入后即可解锁查看与发布功能</p>
                 <div id="emailBox" style="display: none;">
                     <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
                     <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
@@ -156,73 +155,64 @@
         let localFiles = { store_m: [], store_c: [], store_j: [] };
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // --- 【核心增强修改】：放宽网段识别范围 ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
-            
-            // 1. 兼容手机端 IPv6 (以你学校的 240c:ca0d 开头)
-            if (ip.includes(':')) {
-                return ip.toLowerCase().startsWith('240c:ca0d');
-            }
-
-            // 2. 兼容电脑端 IPv4
+            if (ip.includes(':')) return ip.toLowerCase().startsWith('240c:ca0d');
             const parts = ip.split('.');
             if(parts.length !== 4) return false;
             const p = parts.map(Number);
-
-            // A. 教育网段 (电脑图片显示的 210.44.95.x)
             if (p[0] === 210 && p[1] === 44 && (p[2] === 94 || p[2] === 95)) return true;
-            
-            // B. 联通/公网出口段 (查询工具显示的 112.253.x.x)
             if (p[0] === 112 && p[1] === 253) return true;
-
             return false; 
         }
         
-        // --- 【核心增强修改】：获取 IP 时不再强制排除 IPv6 ---
         async function getIP() { 
             const apis = [
-                { url: 'https://api.ipify.org?format=json', key: 'ip' }, // 优先获取 IPv4
-                { url: 'https://api64.ipify.org?format=json', key: 'ip' }, // 兼容获取 IPv6
-                { url: 'https://v4.ident.me/.json', key: 'address' }
+                { url: 'https://api.ipify.org?format=json', key: 'ip' },
+                { url: 'https://api64.ipify.org?format=json', key: 'ip' }
             ];
-            
             for (let api of apis) {
                 try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 4000);
-                    const response = await fetch(api.url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
+                    const response = await fetch(api.url);
                     const d = await response.json();
-                    const ip = d[api.key] || d.address || d.query;
-                    if (ip) return ip;
+                    return d[api.key];
                 } catch (e) { continue; }
             }
             return null; 
         }
 
-        // 修改：检测过期时间的辅助函数
+        // 修改1：拼车过期判断改为 24小时后
         function isCarpoolExpired(timeStr) {
             if (!timeStr) return false;
             try {
-                // 尝试解析常见时间格式，例如 "2026-03-06 12:00" 或 "03-06 12:00"
                 const cleanStr = timeStr.replace('月', '-').replace('日', '').trim();
-                const postTime = new Date(cleanStr);
-                // 如果只输入了时间，补充上今天的日期
+                let postTime = new Date(cleanStr);
                 if (isNaN(postTime.getTime())) {
                     const today = new Date().toLocaleDateString();
-                    const fullTime = new Date(today + " " + timeStr);
-                    if (!isNaN(fullTime.getTime())) return fullTime < new Date();
-                    return false;
+                    postTime = new Date(today + " " + timeStr);
                 }
-                return postTime < new Date();
+                if (isNaN(postTime.getTime())) return false;
+                
+                // 过期时间 = 设定的出发时间 + 24小时
+                const expireTime = postTime.getTime() + (24 * 60 * 60 * 1000);
+                return new Date().getTime() > expireTime;
             } catch(e) { return false; }
+        }
+
+        // 核心修改：实时环境检测工具
+        async function checkEnvironment() {
+            const userIP = await getIP();
+            const isInRange = isIPInRange(userIP);
+            if (!isInRange && !isAdmin) {
+                alert("⚠️ 接入环境异常：\n您当前正在使用外部网络（流量或外网WiFi）。\n根据校园安全要求，查看详情与发布功能必须在校园网环境下使用。");
+                openAuthModal();
+                return false;
+            }
+            return true;
         }
         
         async function openAuthModal() {
-            openModal('authModal');
-            // 注意：这里不再因为 isLogin 为真就返回，因为我们需要强制检测 IP 环境
-            
+            openModal('authModal', true); // 特殊标记，不检查环境直接打开
             const statusBox = document.getElementById('ipStatus');
             const emailBox = document.getElementById('emailBox');
             const loginArea = document.getElementById('loginFormArea');
@@ -233,11 +223,9 @@
             statusBox.innerHTML = "⏳ 正在同步校园网准入状态...";
             
             const userIP = await getIP();
-            
             if (isIPInRange(userIP)) {
                 statusBox.innerHTML = `✅ 认证成功！<br>当前校园网接入: ${userIP}`;
                 statusBox.className = "ip-tip ip-success";
-                // 只有环境正确，且未登录时，才显示邮箱登录框
                 if(!isLogin) {
                     emailBox.style.display = 'block'; 
                     loginArea.style.display = 'block';
@@ -250,13 +238,78 @@
                 statusBox.innerHTML = `🚫 接入受限：必须使用校园网环境<br><span style="font-size:10px; color:#999">(识别到IP: ${userIP || '获取失败'})</span><br><div class="retry-link" onclick="openAuthModal()">点击重试检测</div>`;
                 statusBox.className = "ip-tip ip-fail";
                 emailBox.style.display = 'none'; 
-                // 即使登录了，如果 IP 不对，也要隐藏用户信息并强制锁定在登录/认证界面
                 loginArea.style.display = 'block';
                 userArea.style.display = 'none';
             }
         }
 
-        // --- 完整保留以下所有原始功能逻辑 ---
+        async function showDetail(type, index) {
+            // 修改2：点击详情前强制检查环境
+            const envOk = await checkEnvironment();
+            if (!envOk) return;
+
+            if (!isLogin) { alert("🔐 请先建立云连接验证身份。"); openAuthModal(); return; }
+            const item = globalData[type][index];
+            const content = document.getElementById('detailContent');
+            const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
+            const isOwner = myPosts.includes(item.id);
+            const canDelete = isOwner || isAdmin; 
+            const images = Array.isArray(item.images) ? item.images : [];
+            content.innerHTML = `
+                <div class="detail-gallery">
+                    ${images.map(u => `<img src="${u}" onclick="viewImage('${u}')" onerror="this.src='${PLACEHOLDER}'">`).join('')}
+                </div>
+                <div style="padding:10px 0">
+                    <h2 style="color:var(--primary)">${item.name || item.route || item.title}</h2>
+                    <div style="background:#f9fafb; padding:15px; border-radius:12px; margin:15px 0">
+                        <p><b>📱 联系方式：</b>${item.contact}</p>
+                        ${item.price ? `<p><b>💰 价格：</b><span class="price">¥${item.price}</span></p>` : ''}
+                        ${item.time ? `<p><b>⏰ 时间：</b>${item.time}</p>` : ''}
+                        ${item.pay ? `<p><b>💎 待遇：</b>${item.pay}</p>` : ''}
+                    </div>
+                    ${item.desc ? `<p style="white-space:pre-wrap;">${item.desc}</p>` : ''}
+                </div>
+                ${canDelete ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除发布 (仅作者可见)</button>` : ''}
+            `;
+            openModal('detailModal');
+        }
+
+        async function submit(type) {
+            // 修改3：发布前强制检查环境
+            const envOk = await checkEnvironment();
+            if (!envOk) return;
+
+            if(!isLogin) return alert("请先验证身份！");
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "正在发布..."; btn.disabled = true;
+            try {
+                let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
+                const imgUrls = [];
+                for(let f of localFiles[key]) {
+                    const fname = `public/${Date.now()}_${f.name.replace(/[^\x00-\x7F]/g, "")}`;
+                    await _supabase.storage.from('images').upload(fname, f);
+                    imgUrls.push(_supabase.storage.from('images').getPublicUrl(fname).data.publicUrl);
+                }
+                const payload = { images: imgUrls, contact: document.getElementById(type[0].toLowerCase()+'_c').value };
+                if(type === 'Market') { payload.name = document.getElementById('m_t').value; payload.price = document.getElementById('m_p').value; }
+                else if(type === 'Carpool') { payload.route = document.getElementById('c_t').value; payload.time = document.getElementById('c_time').value; }
+                else if(type === 'Job') { payload.title = document.getElementById('j_t').value; payload.pay = document.getElementById('j_p').value; payload.desc = document.getElementById('j_d').value; }
+                const { data, error } = await _supabase.from(type).insert([payload]).select();
+                if(error) throw error;
+                const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
+                myPosts.push(data[0].id);
+                localStorage.setItem('my_posts', JSON.stringify(myPosts));
+                alert("发布成功！");
+                closeModal(); load();
+                btn.disabled = false; btn.innerText = originalText;
+                document.querySelectorAll('.modal-content input, .modal-content textarea').forEach(i => i.value = '');
+                document.querySelectorAll('.preview-grid').forEach(g => g.innerHTML = '');
+                localFiles = { store_m: [], store_c: [], store_j: [] };
+            } catch (e) { alert("发布失败: " + e.message); btn.disabled = false; btn.innerText = originalText; }
+        }
+
+        // --- 以下为保持不变的原始逻辑代码 ---
         function adminLogin() {
             if (document.getElementById('adminPwd').value === "051218") {
                 isAdmin = true;
@@ -297,33 +350,6 @@
             if(email) document.getElementById('displayUserEmail').innerText = email;
         }
 
-        function showDetail(type, index) {
-            if (!isLogin) { alert("🔐 请先建立云连接验证身份。"); openAuthModal(); return; }
-            const item = globalData[type][index];
-            const content = document.getElementById('detailContent');
-            const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
-            const isOwner = myPosts.includes(item.id);
-            const canDelete = isOwner || isAdmin; 
-            const images = Array.isArray(item.images) ? item.images : [];
-            content.innerHTML = `
-                <div class="detail-gallery">
-                    ${images.map(u => `<img src="${u}" onclick="viewImage('${u}')" onerror="this.src='${PLACEHOLDER}'">`).join('')}
-                </div>
-                <div style="padding:10px 0">
-                    <h2 style="color:var(--primary)">${item.name || item.route || item.title}</h2>
-                    <div style="background:#f9fafb; padding:15px; border-radius:12px; margin:15px 0">
-                        <p><b>📱 联系方式：</b>${item.contact}</p>
-                        ${item.price ? `<p><b>💰 价格：</b><span class="price">¥${item.price}</span></p>` : ''}
-                        ${item.time ? `<p><b>⏰ 时间：</b>${item.time}</p>` : ''}
-                        ${item.pay ? `<p><b>💎 待遇：</b>${item.pay}</p>` : ''}
-                    </div>
-                    ${item.desc ? `<p style="white-space:pre-wrap;">${item.desc}</p>` : ''}
-                </div>
-                ${canDelete ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除发布 (仅作者可见)</button>` : ''}
-            `;
-            openModal('detailModal');
-        }
-
         async function deletePost(id, type) {
             if (!confirm("确定要永久删除这条发布吗？此操作不可撤销。")) return;
             try {
@@ -340,40 +366,8 @@
                 let myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
                 myPosts = myPosts.filter(pId => String(pId) !== String(id));
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
-                if(arguments.callee.name !== "autoCleanup") alert("删除成功！"); 
                 closeModal(); load();
             } catch (e) { console.log("Delete error:", e); }
-        }
-
-        async function submit(type) {
-            if(!isLogin) return alert("请先验证身份！");
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = "正在发布..."; btn.disabled = true;
-            try {
-                let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
-                const imgUrls = [];
-                for(let f of localFiles[key]) {
-                    const fname = `public/${Date.now()}_${f.name.replace(/[^\x00-\x7F]/g, "")}`;
-                    await _supabase.storage.from('images').upload(fname, f);
-                    imgUrls.push(_supabase.storage.from('images').getPublicUrl(fname).data.publicUrl);
-                }
-                const payload = { images: imgUrls, contact: document.getElementById(type[0].toLowerCase()+'_c').value };
-                if(type === 'Market') { payload.name = document.getElementById('m_t').value; payload.price = document.getElementById('m_p').value; }
-                else if(type === 'Carpool') { payload.route = document.getElementById('c_t').value; payload.time = document.getElementById('c_time').value; }
-                else if(type === 'Job') { payload.title = document.getElementById('j_t').value; payload.pay = document.getElementById('j_p').value; payload.desc = document.getElementById('j_d').value; }
-                const { data, error } = await _supabase.from(type).insert([payload]).select();
-                if(error) throw error;
-                const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
-                myPosts.push(data[0].id);
-                localStorage.setItem('my_posts', JSON.stringify(myPosts));
-                alert("发布成功！");
-                closeModal(); load();
-                btn.disabled = false; btn.innerText = originalText;
-                document.querySelectorAll('.modal-content input, .modal-content textarea').forEach(i => i.value = '');
-                document.querySelectorAll('.preview-grid').forEach(g => g.innerHTML = '');
-                localFiles = { store_m: [], store_c: [], store_j: [] };
-            } catch (e) { alert("发布失败: " + e.message); btn.disabled = false; btn.innerText = originalText; }
         }
 
         async function load() {
@@ -381,11 +375,10 @@
             const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
             const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
             
-            // 自动删除过期的拼车计划
             if(c) {
                 for (let item of c) {
                     if(isCarpoolExpired(item.time)) {
-                        _supabase.from('Carpool').delete().eq('id', item.id).then(()=>{}); // 异步后台删除
+                        _supabase.from('Carpool').delete().eq('id', item.id).then(()=>{});
                     }
                 }
             }
@@ -399,7 +392,6 @@
         function render(id, list, type) {
             const container = document.getElementById(id);
             container.innerHTML = list.map((item, index) => {
-                // 如果是拼车且已过期，添加显眼的标注
                 const expired = type === 'Carpool' && isCarpoolExpired(item.time);
                 return `
                 <div class="card" onclick="showDetail('${type}', ${index})">
@@ -418,13 +410,13 @@
             const email = document.getElementById('emailInput').value.trim();
             if (!email.includes('@')) return alert("格式不正确");
             const { error } = await _supabase.auth.signInWithOtp({ email });
-            if (error) alert(error.message); else { document.getElementById('verifyArea').style.display = 'block'; alert("验证码已发送，请查收邮箱！"); }
+            if (error) alert(error.message); else { document.getElementById('verifyArea').style.display = 'block'; alert("验证码已发送！"); }
         }
         async function handleVerifyCode() {
             const email = document.getElementById('emailInput').value.trim();
             const token = document.getElementById('codeInput').value.trim();
             const { error } = await _supabase.auth.verifyOtp({ email, token, type: 'email' });
-            if (error) alert("验证码错误或已过期: " + error.message); else { closeModal(); }
+            if (error) alert("验证码错误"); else { closeModal(); }
         }
         async function handleLogout() { if(confirm("确定退出登录吗？")) { isAdmin = false; await _supabase.auth.signOut(); location.reload(); } }
         function handleSearch() {
@@ -440,15 +432,23 @@
             document.getElementById(id + 'Section').classList.add('active');
             document.getElementById('nav-' + id).classList.add('active');
         }
-        function openModal(id) { document.getElementById(id).classList.add('open'); }
+        
+        // 修改：打开模态框时增加环境校验
+        async function openModal(id, skipCheck = false) { 
+            if (!skipCheck && id !== 'authModal') {
+                const envOk = await checkEnvironment();
+                if (!envOk) return;
+            }
+            document.getElementById(id).classList.add('open'); 
+        }
+
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
         
-        // 修改后的启动逻辑：先检IP，再检Session
         window.onload = async () => { 
             await checkSession(); 
             const userIP = await getIP();
             if (!isIPInRange(userIP)) {
-                openAuthModal(); // 强制锁定
+                // 不再自动强制弹窗，允许浏览，但操作时会拦截
             }
             await load(); 
         };
