@@ -111,7 +111,7 @@
             <div id="ipStatus" class="ip-tip">正在检测接入环境...</div>
             <div id="loginFormArea">
                 <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
-                <div id="emailBox">
+                <div id="emailBox" style="display: none;">
                     <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
                     <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
                 </div>
@@ -161,24 +161,58 @@
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
         // 基础功能
-        async function getIP() { try { const r = await fetch('https://api.ipify.org?format=json'); const d = await r.json(); return d.ip; } catch (e) { return null; } }
         function isIPInRange(ip) { if(!ip) return false; const p = ip.split('.').map(Number); return p[0] === 112 && p[1] === 253; }
         
+        // 修改2：增强版 getIP，带有多个API轮询和超时保护
+        async function getIP() { 
+            const apis = [
+                'https://api.ipify.org?format=json',
+                'https://api.myip.com',
+                'https://freeipapi.com/api/json'
+            ];
+            
+            for (let api of apis) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
+                    const r = await fetch(api, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    
+                    const d = await r.json();
+                    if (d.ip) return d.ip;
+                    if (d.ipAddress) return d.ipAddress; 
+                } catch (e) {
+                    console.warn(`接口 ${api} 获取IP失败，正在尝试下一个...`);
+                    continue; 
+                }
+            }
+            return null; 
+        }
+        
+        // 修改3：增强版 openAuthModal，严格控制邮箱框显示时机
         async function openAuthModal() {
             openModal('authModal');
             if (isLogin) return;
+            
             const statusBox = document.getElementById('ipStatus');
             const emailBox = document.getElementById('emailBox');
-            const userIP = await getIP();
+            
+            // 请求前隐藏邮箱框并提示加载中
+            emailBox.style.display = 'none'; 
             statusBox.className = "ip-tip";
+            statusBox.innerText = "⏳ 正在拼命检测网络环境，请稍候...";
+            
+            const userIP = await getIP();
+            
+            // 验证IP并决定是否展示邮箱框
             if (isIPInRange(userIP)) {
                 statusBox.innerText = `当前接入IP: ${userIP}\n(校内网段，已自动授信)`;
                 statusBox.classList.add('ip-success');
-                emailBox.style.display = 'block';
+                emailBox.style.display = 'block'; 
             } else {
-                statusBox.innerText = `🚫 接入受限：当前IP ${userIP || '未知'} 不在校内。`;
+                statusBox.innerText = `🚫 接入受限：当前IP ${userIP || '未知'} 不在校内。\n(请确认是否连接了校园WiFi)`;
                 statusBox.classList.add('ip-fail');
-                emailBox.style.display = 'none';
+                emailBox.style.display = 'none'; 
             }
         }
 
