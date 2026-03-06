@@ -58,9 +58,10 @@
         .admin-entry { margin-top: 30px; padding-top: 20px; border-top: 1px dashed #eee; }
         .admin-entry p { font-size: 12px; color: #bbb; cursor: pointer; }
         #adminBox { display: none; margin-top: 10px; }
-        .ip-tip { font-size: 12px; padding: 10px; border-radius: 6px; margin-bottom: 15px; min-height: 40px; display: flex; align-items: center; justify-content: center; text-align: center; }
+        .ip-tip { font-size: 12px; padding: 10px; border-radius: 6px; margin-bottom: 15px; min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.5; }
         .ip-success { background: #f0fdf4; color: #166534; border: 1px solid #bcf0da; }
         .ip-fail { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+        .retry-link { color: #4f46e5; text-decoration: underline; cursor: pointer; margin-top: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -160,42 +161,63 @@
         let localFiles = { store_m: [], store_c: [], store_j: [] };
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // 核心修正点：精准判断 112.253.0.0 ~ 112.253.255.255
+        // --- 精准判断 IPv4 范围 ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
             const parts = ip.split('.');
             if(parts.length !== 4) return false;
             const p = parts.map(Number);
-            // 匹配 112.253.X.X
-            return p[0] === 112 && p[1] === 253 && p[2] >= 0 && p[2] <= 255 && p[3] >= 0 && p[3] <= 255; 
+            return p[0] === 112 && p[1] === 253 && !isNaN(p[2]) && !isNaN(p[3]); 
         }
         
-        // 核心修正点：多源 IP 获取
+        // --- 强制 IPv4 获取逻辑 (跳过 IPv6) ---
         async function getIP() { 
             const apis = [
-                'https://api.ipify.org?format=json',
-                'https://ipapi.co/json/',
-                'https://api.myip.com'
+                // 使用专门的 ipv4 接口域名
+                { url: 'https://api4.ipify.org?format=json', key: 'ip' }, 
+                { url: 'https://v4.ident.me/.json', key: 'address' },
+                { url: 'https://vv.video.qq.com/checktime?otype=json', regex: /"ip":"([^"]+)"/ },
+                { url: 'https://ipv4.icanhazip.com' } // 返回纯文本
             ];
             
             for (let api of apis) {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4秒超时
-                    const r = await fetch(api, { signal: controller.signal });
+                    const timeoutId = setTimeout(() => controller.abort(), 3500);
+                    const response = await fetch(api.url, { signal: controller.signal });
                     clearTimeout(timeoutId);
-                    const d = await r.json();
-                    const foundIP = d.ip || d.ipAddress || d.query;
-                    if (foundIP) return foundIP;
+                    
+                    const text = await response.text();
+                    let ip = null;
+                    
+                    if (api.regex) {
+                        const match = text.match(api.regex);
+                        if (match) ip = match[1];
+                    } else {
+                        try {
+                            const d = JSON.parse(text);
+                            ip = d[api.key] || d.ip || d.query || d.address;
+                        } catch(e) {
+                            ip = text.trim(); // 针对纯文本接口
+                        }
+                    }
+
+                    // 【核心修改点】：通过逻辑判断排除 IPv6
+                    // IPv4 必须包含 "." 且 不能包含 ":"
+                    if (ip && ip.includes('.') && !ip.includes(':')) {
+                        console.log("成功获取 IPv4:", ip);
+                        return ip;
+                    } else {
+                        console.warn("获取到非 IPv4 地址，跳过:", ip);
+                    }
                 } catch (e) {
-                    console.warn(`接口 ${api} 失败`);
+                    console.warn(`接口获取失败，切换下一个...`);
                     continue; 
                 }
             }
             return null; 
         }
         
-        // 核心修正点：登录弹窗逻辑加固
         async function openAuthModal() {
             openModal('authModal');
             if (isLogin) return;
@@ -203,25 +225,24 @@
             const statusBox = document.getElementById('ipStatus');
             const emailBox = document.getElementById('emailBox');
             
-            // 初始化状态
             emailBox.style.display = 'none'; 
             statusBox.className = "ip-tip";
-            statusBox.innerText = "⏳ 正在校准校园网接入环境...";
+            statusBox.innerHTML = "⏳ 正在同步校园网准入状态...";
             
             const userIP = await getIP();
             
             if (isIPInRange(userIP)) {
-                statusBox.innerText = `✅ 认证成功！当前校园IP: ${userIP}\n您已获得访问权限`;
+                statusBox.innerHTML = `✅ 认证成功！当前校园IP: ${userIP}<br>您已获得云端访问权限`;
                 statusBox.className = "ip-tip ip-success";
                 emailBox.style.display = 'block'; 
             } else {
-                statusBox.innerText = `🚫 接入受限：当前IP ${userIP || '未知'} 不在授权段。\n请连接山东第二医科大学校园网`;
+                statusBox.innerHTML = `🚫 接入受限：当前处于校外环境<br><span style="font-size:10px; color:#999">(识别IP: ${userIP || '获取失败'})</span><br><div class="retry-link" onclick="openAuthModal()">点击重试检测</div>`;
                 statusBox.className = "ip-tip ip-fail";
                 emailBox.style.display = 'none'; 
             }
         }
 
-        // --- 以下功能函数完全保留，未做删减 ---
+        // --- 以下原代码功能完全保留 ---
         function adminLogin() {
             if (document.getElementById('adminPwd').value === "051218") {
                 isAdmin = true;
