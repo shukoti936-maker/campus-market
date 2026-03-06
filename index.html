@@ -34,6 +34,9 @@
         .card-body { padding: 12px; }
         .price { color: var(--danger); font-size: 1.1rem; font-weight: 800; }
 
+        /* 过期标志样式 */
+        .expired-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); border: 4px solid var(--danger); color: var(--danger); padding: 10px 20px; font-size: 2rem; font-weight: 900; background: rgba(255,255,255,0.9); border-radius: 10px; z-index: 5; pointer-events: none; opacity: 0.9; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .modal.open { display: flex; }
         .modal-content { background: white; width: 95%; max-width: 500px; padding: 25px; border-radius: 16px; max-height: 85vh; overflow-y: auto; position: relative; }
@@ -134,7 +137,9 @@
         </div>
     </div>
     <div id="detailModal" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><div id="detailContent"></div></div></div>
-    <div id="pubMarket" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布二手商品</h3><input type="text" id="m_t" placeholder="商品名称"><input type="number" id="m_p" placeholder="价格 (¥)"><input type="text" id="m_c" placeholder="联系微信号"><label>上传图片：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')"><div class="preview-grid" id="pre_m"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button></div></div>
+    
+    <div id="pubMarket" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布二手商品</h3><input type="text" id="m_t" placeholder="商品名称"><input type="number" id="m_p" placeholder="价格 (¥)"><input type="text" id="m_c" placeholder="联系微信号"><label>上传图片：</label><div style="color:var(--primary); font-size:12px; font-weight:bold; margin-bottom:5px;">💡 建议最后一张图片上传为支付码以方便支付</div><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')"><div class="preview-grid" id="pre_m"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button></div></div>
+    
     <div id="pubCarpool" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布拼车行程</h3><input type="text" id="c_t" placeholder="出发地 - 目的地"><input type="text" id="c_time" placeholder="出发时间"><input type="text" id="c_c" placeholder="联系方式"><label>行程图：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_c', 'store_c')"><div class="preview-grid" id="pre_c"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Carpool')">确认发布</button></div></div>
     <div id="pubJob" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布兼职招聘</h3><input type="text" id="j_t" placeholder="岗位名称"><input type="text" id="j_p" placeholder="薪资"><textarea id="j_d" placeholder="要求" rows="4"></textarea><input type="text" id="j_c" placeholder="联系方式"><label>海报图：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_j', 'store_j')"><div class="preview-grid" id="pre_j"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Job')">确认发布</button></div></div>
 
@@ -195,13 +200,33 @@
             }
             return null; 
         }
+
+        // 修改：检测过期时间的辅助函数
+        function isCarpoolExpired(timeStr) {
+            if (!timeStr) return false;
+            try {
+                // 尝试解析常见时间格式，例如 "2026-03-06 12:00" 或 "03-06 12:00"
+                const cleanStr = timeStr.replace('月', '-').replace('日', '').trim();
+                const postTime = new Date(cleanStr);
+                // 如果只输入了时间，补充上今天的日期
+                if (isNaN(postTime.getTime())) {
+                    const today = new Date().toLocaleDateString();
+                    const fullTime = new Date(today + " " + timeStr);
+                    if (!isNaN(fullTime.getTime())) return fullTime < new Date();
+                    return false;
+                }
+                return postTime < new Date();
+            } catch(e) { return false; }
+        }
         
         async function openAuthModal() {
             openModal('authModal');
-            if (isLogin) return;
+            // 注意：这里不再因为 isLogin 为真就返回，因为我们需要强制检测 IP 环境
             
             const statusBox = document.getElementById('ipStatus');
             const emailBox = document.getElementById('emailBox');
+            const loginArea = document.getElementById('loginFormArea');
+            const userArea = document.getElementById('userInfoArea');
             
             emailBox.style.display = 'none'; 
             statusBox.className = "ip-tip";
@@ -212,11 +237,22 @@
             if (isIPInRange(userIP)) {
                 statusBox.innerHTML = `✅ 认证成功！<br>当前校园网接入: ${userIP}`;
                 statusBox.className = "ip-tip ip-success";
-                emailBox.style.display = 'block'; 
+                // 只有环境正确，且未登录时，才显示邮箱登录框
+                if(!isLogin) {
+                    emailBox.style.display = 'block'; 
+                    loginArea.style.display = 'block';
+                    userArea.style.display = 'none';
+                } else {
+                    loginArea.style.display = 'none';
+                    userArea.style.display = 'block';
+                }
             } else {
-                statusBox.innerHTML = `🚫 接入受限：不在授权段<br><span style="font-size:10px; color:#999">(识别到IP: ${userIP || '获取失败'})</span><br><div class="retry-link" onclick="openAuthModal()">点击重试检测</div>`;
+                statusBox.innerHTML = `🚫 接入受限：必须使用校园网环境<br><span style="font-size:10px; color:#999">(识别到IP: ${userIP || '获取失败'})</span><br><div class="retry-link" onclick="openAuthModal()">点击重试检测</div>`;
                 statusBox.className = "ip-tip ip-fail";
                 emailBox.style.display = 'none'; 
+                // 即使登录了，如果 IP 不对，也要隐藏用户信息并强制锁定在登录/认证界面
+                loginArea.style.display = 'block';
+                userArea.style.display = 'none';
             }
         }
 
@@ -304,8 +340,9 @@
                 let myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
                 myPosts = myPosts.filter(pId => String(pId) !== String(id));
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
-                alert("删除成功！"); closeModal(); load();
-            } catch (e) { alert("删除失败: " + e.message); }
+                if(arguments.callee.name !== "autoCleanup") alert("删除成功！"); 
+                closeModal(); load();
+            } catch (e) { console.log("Delete error:", e); }
         }
 
         async function submit(type) {
@@ -343,6 +380,16 @@
             const { data: m } = await _supabase.from('Market').select('*').order('created_at', {ascending:false});
             const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
             const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
+            
+            // 自动删除过期的拼车计划
+            if(c) {
+                for (let item of c) {
+                    if(isCarpoolExpired(item.time)) {
+                        _supabase.from('Carpool').delete().eq('id', item.id).then(()=>{}); // 异步后台删除
+                    }
+                }
+            }
+
             globalData = { Market: m||[], Carpool: c||[], Job: j||[] };
             render('marketList', globalData.Market, 'Market');
             render('carpoolList', globalData.Carpool, 'Carpool');
@@ -351,16 +398,20 @@
 
         function render(id, list, type) {
             const container = document.getElementById(id);
-            container.innerHTML = list.map((item, index) => `
+            container.innerHTML = list.map((item, index) => {
+                // 如果是拼车且已过期，添加显眼的标注
+                const expired = type === 'Carpool' && isCarpoolExpired(item.time);
+                return `
                 <div class="card" onclick="showDetail('${type}', ${index})">
-                    <img src="${(item.images && item.images[0]) || PLACEHOLDER}" class="card-img" onerror="this.src='${PLACEHOLDER}'">
+                    ${expired ? '<div class="expired-badge">已过期</div>' : ''}
+                    <img src="${(item.images && item.images[0]) || PLACEHOLDER}" class="card-img" style="${expired ? 'filter:grayscale(1) opacity(0.5);' : ''}" onerror="this.src='${PLACEHOLDER}'">
                     <div class="card-body">
                         ${type==='Market' ? `<div class="price">¥${item.price}</div><h4>${item.name}</h4>` : ''}
                         ${type==='Carpool' ? `<h4>${item.route}</h4><p>⏰ ${item.time}</p>` : ''}
                         ${type==='Job' ? `<div style="color:var(--secondary);font-weight:bold">${item.pay}</div><h4>${item.title}</h4>` : ''}
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         async function handleEmailLogin() {
@@ -391,7 +442,16 @@
         }
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
-        window.onload = async () => { await checkSession(); await load(); };
+        
+        // 修改后的启动逻辑：先检IP，再检Session
+        window.onload = async () => { 
+            await checkSession(); 
+            const userIP = await getIP();
+            if (!isIPInRange(userIP)) {
+                openAuthModal(); // 强制锁定
+            }
+            await load(); 
+        };
     </script>
 </body>
 </html>
