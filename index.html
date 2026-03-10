@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园生活助手 - 增强验证版</title>
+    <title>校园生活助手 - 社交增强版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #4f46e5; --secondary: #10b981; --bg: #f3f4f6; --text: #1f2937; --danger: #ef4444; }
@@ -16,13 +16,14 @@
         .search-box input { width: 100%; padding: 8px 35px 8px 15px; border-radius: 20px; border: 1px solid #ddd; outline: none; font-size: 0.9rem; }
         .search-icon { position: absolute; right: 12px; top: 8px; color: #999; }
         
-        nav { display: flex; gap: 5px; }
+        nav { display: flex; gap: 5px; flex-wrap: wrap; }
         .nav-link { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; color: #666; transition: 0.3s; font-size: 0.9rem; }
         .nav-link.active { background: var(--primary); color: white; }
         
         main { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .btn-main { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-chat { background: var(--secondary); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin-top: 10px; width: 100%; font-weight: bold; }
         
         .content-section { display: none; }
         .content-section.active { display: block; }
@@ -34,7 +35,6 @@
         .card-body { padding: 12px; }
         .price { color: var(--danger); font-size: 1.1rem; font-weight: 800; }
 
-        /* 过期标志样式 */
         .expired-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); border: 4px solid var(--danger); color: var(--danger); padding: 10px 20px; font-size: 2rem; font-weight: 900; background: rgba(255,255,255,0.9); border-radius: 10px; z-index: 5; pointer-events: none; opacity: 0.9; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
@@ -48,7 +48,7 @@
         #imgViewer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center; }
         #imgViewer img { max-width: 95%; max-height: 95%; object-fit: contain; }
 
-        .del-btn { background: #fee2e2; color: var(--danger); border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin-top: 20px; width: 100%; font-weight: bold; }
+        .del-btn { background: #fee2e2; color: var(--danger); border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; margin-top: 10px; width: 100%; font-weight: bold; }
         
         input, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; outline: none; font-size: 1rem; }
         label { font-size: 0.85rem; color: #666; font-weight: bold; }
@@ -56,7 +56,6 @@
         .preview-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
         .preview-item { position: relative; width: 60px; height: 60px; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-        .tip-box { font-size: 11px; color: #f59e0b; background: #fffbeb; padding: 8px; border-radius: 6px; margin-top: 5px; border: 1px solid #fef3c7; }
 
         .admin-entry { margin-top: 30px; padding-top: 20px; border-top: 1px dashed #eee; }
         .admin-entry p { font-size: 12px; color: #bbb; cursor: pointer; }
@@ -65,6 +64,19 @@
         .ip-success { background: #f0fdf4; color: #166534; border: 1px solid #bcf0da; }
         .ip-fail { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
         .retry-link { color: #4f46e5; text-decoration: underline; cursor: pointer; margin-top: 5px; font-weight: bold; }
+
+        /* 新增：聊天相关样式 */
+        .chat-thread-card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; border-left: 4px solid var(--primary); }
+        .chat-thread-card h4 { margin-bottom: 5px; color: #333; }
+        .chat-thread-card p { font-size: 12px; color: #888; }
+        
+        .chat-box { flex-grow: 1; background: #f3f4f6; border-radius: 8px; padding: 15px; overflow-y: auto; margin: 10px 0; display: flex; flex-direction: column; gap: 10px; min-height: 300px; max-height: 50vh; }
+        .msg-bubble { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-left { align-self: flex-start; background: white; color: #333; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .msg-right { align-self: flex-end; background: #95ec69; color: #333; border-bottom-right-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .msg-time { font-size: 10px; color: #aaa; text-align: center; margin: 5px 0; }
+        
+        .empty-state { text-align: center; padding: 40px 20px; color: #999; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -76,6 +88,8 @@
                 <div class="nav-link active" id="nav-market" onclick="switchSection('market')">二手</div>
                 <div class="nav-link" id="nav-carpool" onclick="switchSection('carpool')">拼车</div>
                 <div class="nav-link" id="nav-jobs" onclick="switchSection('jobs')">兼职</div>
+                <div class="nav-link" id="nav-mine" onclick="switchSection('mine')" style="color: var(--primary);">👤 我的</div>
+                <div class="nav-link" id="nav-chats" onclick="switchSection('chats')" style="color: var(--secondary);">💬 消息</div>
             </nav>
         </div>
         
@@ -102,9 +116,22 @@
             <div class="section-header"><h3>兼职招聘</h3><button class="btn-main" onclick="openModal('pubJob')">+ 发布岗位</button></div>
             <div class="data-grid" id="jobsList"></div>
         </section>
+
+        <section id="mineSection" class="content-section">
+            <div class="section-header"><h3>我的发布记录</h3></div>
+            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">此处显示您本机发布过的所有信息，点击进入可撤回。</p>
+            <div class="data-grid" id="mineList"></div>
+        </section>
+
+        <section id="chatsSection" class="content-section">
+            <div class="section-header"><h3>我的对话记录</h3></div>
+            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">实时接收买家咨询或卖家回复。</p>
+            <div id="chatsListContainer"></div>
+        </section>
     </main>
 
     <div id="imgViewer" onclick="this.style.display='none'"><img id="viewedImg" src=""></div>
+    
     <div id="authModal" class="modal">
         <div class="modal-content" style="text-align:center;">
             <div class="close-btn" onclick="closeModal()">×</div>
@@ -136,11 +163,26 @@
             </div>
         </div>
     </div>
+    
     <div id="detailModal" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><div id="detailContent"></div></div></div>
+    
+    <div id="chatRoomModal" class="modal">
+        <div class="modal-content" style="display:flex; flex-direction:column; padding: 20px;">
+            <div class="close-btn" onclick="closeModal()">×</div>
+            <h3 id="chatRoomTitle" style="font-size: 1.1rem; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 0;">与卖家沟通</h3>
+            <div id="chatBoxContent" class="chat-box">
+                </div>
+            <div style="display:flex; gap:10px; margin-top: 10px;">
+                <input type="text" id="chatMsgInput" placeholder="输入消息..." style="margin:0; flex-grow:1;">
+                <button class="btn-main" onclick="sendChatMessage()" style="white-space: nowrap;">发送</button>
+            </div>
+        </div>
+    </div>
     
     <div id="pubMarket" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布二手商品</h3><input type="text" id="m_t" placeholder="商品名称"><input type="number" id="m_p" placeholder="价格 (¥)"><input type="text" id="m_c" placeholder="联系微信号"><label>上传图片：</label><div style="color:var(--primary); font-size:12px; font-weight:bold; margin-bottom:5px;">💡 建议最后一张图片上传为支付码以方便支付</div><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_m', 'store_m')"><div class="preview-grid" id="pre_m"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Market')">确认发布</button></div></div>
     
     <div id="pubCarpool" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布拼车行程</h3><input type="text" id="c_t" placeholder="出发地 - 目的地"><input type="text" id="c_time" placeholder="出发时间"><input type="text" id="c_c" placeholder="联系方式"><label>行程图：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_c', 'store_c')"><div class="preview-grid" id="pre_c"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Carpool')">确认发布</button></div></div>
+    
     <div id="pubJob" class="modal"><div class="modal-content"><div class="close-btn" onclick="closeModal()">×</div><h3>发布兼职招聘</h3><input type="text" id="j_t" placeholder="岗位名称"><input type="text" id="j_p" placeholder="薪资"><textarea id="j_d" placeholder="要求" rows="4"></textarea><input type="text" id="j_c" placeholder="联系方式"><label>海报图：</label><input type="file" multiple accept="image/*" onchange="handleImgs(this, 'pre_j', 'store_j')"><div class="preview-grid" id="pre_j"></div><button class="btn-main" style="width:100%; margin-top:10px" onclick="submit('Job')">确认发布</button></div></div>
 
     <script>
@@ -152,57 +194,52 @@
 
         let isLogin = false;
         let isAdmin = false; 
+        let currentUserEmail = null; // 新增：保存当前用户的邮箱作为身份标识
         let globalData = { Market: [], Carpool: [], Job: [] };
         let localFiles = { store_m: [], store_c: [], store_j: [] };
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
-        // --- 【核心增强修改】：放宽网段识别范围 ---
+        // 聊天上下文信息
+        let activeChatContext = { postId: null, postTitle: null, receiverEmail: null };
+
+        // 保持原有的 IP 检测逻辑 (包含你新抓的段和防拦截接口)
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
-            
-            // 1. 兼容手机端 IPv6 (以你学校的 240c:ca0d 开头)
             if (ip.includes(':')) {
                 return ip.toLowerCase().startsWith('240c:ca0d');
             }
-
-            // 2. 兼容电脑端 IPv4
             const parts = ip.split('.');
             if(parts.length !== 4) return false;
             const p = parts.map(Number);
-
-            // A. 教育网段 (电脑图片显示的 210.44.95.x)
             if (p[0] === 210 && p[1] === 44 && (p[2] === 94 || p[2] === 95)) return true;
-            
-            // B. 联通/公网出口段 (包含原有的 112.253 和你新发现的 112.224)
             if (p[0] === 112 && (p[1] === 253 || p[1] === 224)) return true;
-
             return false; 
         }
         
-        // --- 【安全获取】：防 Safari 拦截补充接口 ---
         async function getIP() { 
-            const apis = [
-                { url: 'https://api.ipify.org?format=json', key: 'ip' }, // 优先获取 IPv4
-                { url: 'https://api64.ipify.org?format=json', key: 'ip' }, // 兼容获取 IPv6
-                { url: 'https://v4.ident.me/.json', key: 'address' },
-                { url: 'https://freeipapi.com/api/json', key: 'ipAddress' } // 防 Safari 拦截备用接口
-            ];
-            
-            for (let api of apis) {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 4000);
-                    const response = await fetch(api.url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                    const d = await response.json();
-                    const ip = d[api.key] || d.address || d.query || d.ipAddress;
-                    if (ip) return ip;
-                } catch (e) { continue; }
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000); 
+            try {
+                const fetchQQ = fetch('https://vv.video.qq.com/checktime?otype=json', { signal: controller.signal })
+                    .then(r => r.text())
+                    .then(text => {
+                        const match = text.match(/"ip":"([^"]+)"/);
+                        if (match) return match[1];
+                        throw new Error('Not found');
+                    });
+                const fetchIpify = fetch('https://api.ipify.org?format=json', { signal: controller.signal }).then(r => r.json()).then(d => d.ip || Promise.reject());
+                const fetchIdent = fetch('https://v4.ident.me/.json', { signal: controller.signal }).then(r => r.json()).then(d => d.address || Promise.reject());
+                const fetchFreeIP = fetch('https://freeipapi.com/api/json', { signal: controller.signal }).then(r => r.json()).then(d => d.ipAddress || Promise.reject());
+
+                const ip = await Promise.any([fetchQQ, fetchIpify, fetchIdent, fetchFreeIP]);
+                clearTimeout(timeoutId);
+                return ip;
+            } catch (e) {
+                return null; 
             }
-            return null; 
         }
 
-        // 修改1：拼车过期判断改为 24小时后
+        // 拼车过期判断 24小时
         function isCarpoolExpired(timeStr) {
             if (!timeStr) return false;
             try {
@@ -213,19 +250,17 @@
                     postTime = new Date(today + " " + timeStr);
                 }
                 if (isNaN(postTime.getTime())) return false;
-                
-                // 过期时间 = 设定的出发时间 + 24小时
                 const expireTime = postTime.getTime() + (24 * 60 * 60 * 1000);
                 return new Date().getTime() > expireTime;
             } catch(e) { return false; }
         }
 
-        // 核心修改：实时环境检测工具
+        // 实时环境检测工具
         async function checkEnvironment() {
             const userIP = await getIP();
             const isInRange = isIPInRange(userIP);
             if (!isInRange && !isAdmin) {
-                alert("⚠️ 接入环境异常：\n您当前正在使用外部网络（流量或外网WiFi）。\n根据校园安全要求，查看详情与发布功能必须在校园网环境下使用。");
+                alert("⚠️ 接入环境异常：\n您当前正在使用外部网络（流量或外网WiFi）。\n根据校园安全要求，查看详情、发布与聊天功能必须在校园网环境下使用。");
                 openAuthModal();
                 return false;
             }
@@ -233,7 +268,7 @@
         }
         
         async function openAuthModal() {
-            openModal('authModal', true); // 特殊标记，不检查环境直接打开
+            openModal('authModal', true); 
             const statusBox = document.getElementById('ipStatus');
             const emailBox = document.getElementById('emailBox');
             const loginArea = document.getElementById('loginFormArea');
@@ -265,23 +300,24 @@
         }
 
         async function showDetail(type, index) {
-            // 修改2：点击详情前强制检查环境 (拦截流量绕过)
             const envOk = await checkEnvironment();
             if (!envOk) return;
-
             if (!isLogin) { alert("🔐 请先建立云连接验证身份。"); openAuthModal(); return; }
+            
             const item = globalData[type][index];
             const content = document.getElementById('detailContent');
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
             const isOwner = myPosts.includes(item.id);
             const canDelete = isOwner || isAdmin; 
             const images = Array.isArray(item.images) ? item.images : [];
+            const titleText = item.name || item.route || item.title;
+
             content.innerHTML = `
                 <div class="detail-gallery">
                     ${images.map(u => `<img src="${u}" onclick="viewImage('${u}')" onerror="this.src='${PLACEHOLDER}'">`).join('')}
                 </div>
                 <div style="padding:10px 0">
-                    <h2 style="color:var(--primary)">${item.name || item.route || item.title}</h2>
+                    <h2 style="color:var(--primary)">${titleText}</h2>
                     <div style="background:#f9fafb; padding:15px; border-radius:12px; margin:15px 0">
                         <p><b>📱 联系方式：</b>${item.contact}</p>
                         ${item.price ? `<p><b>💰 价格：</b><span class="price">¥${item.price}</span></p>` : ''}
@@ -290,13 +326,15 @@
                     </div>
                     ${item.desc ? `<p style="white-space:pre-wrap;">${item.desc}</p>` : ''}
                 </div>
+                
+                ${!isOwner && item.author_email ? `<button class="btn-chat" onclick="openChatWindow('${item.id}', '${titleText}', '${item.author_email}')">💬 在线咨询发布者</button>` : ''}
+                ${!isOwner && !item.author_email ? `<p style="font-size:12px; color:#999; text-align:center; margin-top:10px;">该信息为旧版发布，暂不支持在线聊天</p>` : ''}
                 ${canDelete ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除发布 (仅作者可见)</button>` : ''}
             `;
             openModal('detailModal');
         }
 
         async function submit(type) {
-            // 修改3：发布前强制检查环境 (拦截流量绕过)
             const envOk = await checkEnvironment();
             if (!envOk) return;
 
@@ -312,10 +350,18 @@
                     await _supabase.storage.from('images').upload(fname, f);
                     imgUrls.push(_supabase.storage.from('images').getPublicUrl(fname).data.publicUrl);
                 }
-                const payload = { images: imgUrls, contact: document.getElementById(type[0].toLowerCase()+'_c').value };
+                
+                // 新增：将 author_email 绑定到发布的商品信息中
+                const payload = { 
+                    images: imgUrls, 
+                    contact: document.getElementById(type[0].toLowerCase()+'_c').value,
+                    author_email: currentUserEmail || document.getElementById('displayUserEmail').innerText
+                };
+                
                 if(type === 'Market') { payload.name = document.getElementById('m_t').value; payload.price = document.getElementById('m_p').value; }
                 else if(type === 'Carpool') { payload.route = document.getElementById('c_t').value; payload.time = document.getElementById('c_time').value; }
                 else if(type === 'Job') { payload.title = document.getElementById('j_t').value; payload.pay = document.getElementById('j_p').value; payload.desc = document.getElementById('j_d').value; }
+                
                 const { data, error } = await _supabase.from(type).insert([payload]).select();
                 if(error) throw error;
                 const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
@@ -323,6 +369,7 @@
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
                 alert("发布成功！");
                 closeModal(); load();
+                if (document.getElementById('mineSection').classList.contains('active')) renderMine();
                 btn.disabled = false; btn.innerText = originalText;
                 document.querySelectorAll('.modal-content input, .modal-content textarea').forEach(i => i.value = '');
                 document.querySelectorAll('.preview-grid').forEach(g => g.innerHTML = '');
@@ -330,7 +377,179 @@
             } catch (e) { alert("发布失败: " + e.message); btn.disabled = false; btn.innerText = originalText; }
         }
 
-        // --- 以下为保持不变的原始逻辑代码 ---
+        // --- 以下为新增板块的专用逻辑 ---
+
+        // 渲染“我的”板块
+        function renderMine() {
+            const container = document.getElementById('mineList');
+            const myPostIds = JSON.parse(localStorage.getItem('my_posts') || '[]');
+            let allMyData = [];
+            ['Market', 'Carpool', 'Job'].forEach(type => {
+                globalData[type].forEach((item, index) => {
+                    if (myPostIds.includes(item.id)) allMyData.push({ ...item, _type: type, _index: index });
+                });
+            });
+
+            if (allMyData.length === 0) {
+                container.innerHTML = `<div class="empty-state">📭 您还没有发布过任何信息。</div>`;
+                return;
+            }
+
+            container.innerHTML = allMyData.map(item => {
+                const expired = item._type === 'Carpool' && isCarpoolExpired(item.time);
+                return `
+                <div class="card" onclick="showDetail('${item._type}', ${item._index})">
+                    ${expired ? '<div class="expired-badge">已过期</div>' : ''}
+                    <div style="position:absolute; top:5px; right:5px; background:rgba(0,0,0,0.5); color:white; padding:2px 6px; border-radius:4px; font-size:10px; z-index:2">${item._type==='Market'?'二手':item._type==='Carpool'?'拼车':'兼职'}</div>
+                    <img src="${(item.images && item.images[0]) || PLACEHOLDER}" class="card-img" style="${expired ? 'filter:grayscale(1) opacity(0.5);' : ''}" onerror="this.src='${PLACEHOLDER}'">
+                    <div class="card-body">
+                        <h4 style="margin-bottom:5px;">${item.name || item.route || item.title}</h4>
+                        <span style="font-size:12px; color:var(--primary); font-weight:bold;">点击查看或删除</span>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        // 渲染“消息”板块列表
+        async function renderChatList() {
+            const container = document.getElementById('chatsListContainer');
+            if(!isLogin || !currentUserEmail) {
+                container.innerHTML = `<div class="empty-state">请先建立云连接验证身份后查看消息。</div>`;
+                return;
+            }
+            container.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">加载对话中...</div>`;
+            
+            try {
+                // 获取与我相关的消息（发给我的，或我发出的）
+                const { data, error } = await _supabase.from('Messages')
+                    .select('*')
+                    .or(`sender_email.eq.${currentUserEmail},receiver_email.eq.${currentUserEmail}`)
+                    .order('created_at', { ascending: false });
+                
+                if(error) throw error;
+                if(!data || data.length === 0) {
+                    container.innerHTML = `<div class="empty-state">📭 暂无对话记录。去浏览商品联系一下吧！</div>`;
+                    return;
+                }
+
+                // 将消息按 (商品+对方邮箱) 进行分组，提取最新一条
+                let chatThreads = {};
+                data.forEach(msg => {
+                    const otherPerson = msg.sender_email === currentUserEmail ? msg.receiver_email : msg.sender_email;
+                    const threadKey = `${msg.post_id}_${otherPerson}`;
+                    if (!chatThreads[threadKey]) {
+                        chatThreads[threadKey] = {
+                            postId: msg.post_id,
+                            postTitle: msg.post_title,
+                            otherPerson: otherPerson,
+                            lastMsg: msg.content,
+                            time: new Date(msg.created_at).toLocaleString()
+                        };
+                    }
+                });
+
+                container.innerHTML = Object.values(chatThreads).map(thread => `
+                    <div class="chat-thread-card" onclick="openChatWindow('${thread.postId}', '${thread.postTitle}', '${thread.otherPerson}')">
+                        <h4 style="font-size:14px; margin-bottom:6px;">📦 关于：${thread.postTitle}</h4>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; color:#555; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:65%;">💬 ${thread.lastMsg}</span>
+                            <span style="font-size:11px; color:#999;">联系人: ${thread.otherPerson.split('@')[0]}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch(e) {
+                container.innerHTML = `<div class="empty-state">无法加载消息：${e.message}<br>请确保已在 Supabase 创建 Messages 表并开启 Realtime。</div>`;
+            }
+        }
+
+        // 打开具体的聊天房间
+        async function openChatWindow(postId, postTitle, receiverEmail) {
+            const envOk = await checkEnvironment();
+            if (!envOk) return;
+            if(!isLogin) return alert("请先建立连接！");
+            
+            // 记录当前房间上下文
+            activeChatContext = { postId, postTitle, receiverEmail };
+            
+            document.getElementById('chatRoomTitle').innerText = `💬 与 ${receiverEmail.split('@')[0]} 的对话\n(关于: ${postTitle})`;
+            document.getElementById('chatBoxContent').innerHTML = `<div class="empty-state">正在加载历史消息...</div>`;
+            openModal('chatRoomModal', true);
+
+            // 拉取历史消息
+            loadMessagesForCurrentRoom();
+        }
+
+        // 载入当前聊天室消息
+        async function loadMessagesForCurrentRoom() {
+            if(!activeChatContext.postId) return;
+            const { postId, receiverEmail } = activeChatContext;
+            
+            const { data, error } = await _supabase.from('Messages')
+                .select('*')
+                .eq('post_id', postId)
+                .or(`and(sender_email.eq.${currentUserEmail},receiver_email.eq.${receiverEmail}),and(sender_email.eq.${receiverEmail},receiver_email.eq.${currentUserEmail})`)
+                .order('created_at', { ascending: true });
+                
+            const chatBox = document.getElementById('chatBoxContent');
+            if(error) { chatBox.innerHTML = `<div class="empty-state">加载失败</div>`; return; }
+            
+            if(data.length === 0) {
+                chatBox.innerHTML = `<div class="msg-time">暂无聊天记录，开始打个招呼吧！</div>`;
+            } else {
+                chatBox.innerHTML = data.map(msg => {
+                    const isMe = msg.sender_email === currentUserEmail;
+                    return `
+                        <div class="msg-time">${new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        <div class="msg-bubble ${isMe ? 'msg-right' : 'msg-left'}">${msg.content}</div>
+                    `;
+                }).join('');
+            }
+            chatBox.scrollTop = chatBox.scrollHeight; // 滚动到底部
+        }
+
+        // 发送消息
+        async function sendChatMessage() {
+            const input = document.getElementById('chatMsgInput');
+            const text = input.value.trim();
+            if(!text || !activeChatContext.postId) return;
+            
+            input.value = ''; // 清空
+            try {
+                await _supabase.from('Messages').insert([{
+                    post_id: activeChatContext.postId,
+                    post_title: activeChatContext.postTitle,
+                    sender_email: currentUserEmail,
+                    receiver_email: activeChatContext.receiverEmail,
+                    content: text
+                }]);
+                // 插入成功后无需手动添加，交给 Realtime 实时推或者重新拉取
+                loadMessagesForCurrentRoom();
+            } catch(e) { alert("发送失败!"); }
+        }
+
+        // 监听实时消息推送
+        function subscribeToMessages() {
+            if(!currentUserEmail) return;
+            _supabase.channel('public:Messages')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Messages' }, payload => {
+                    const msg = payload.new;
+                    // 如果消息是发给我的，或者是跟我当前打开的聊天框相关的，就刷新界面
+                    if(msg.receiver_email === currentUserEmail || msg.sender_email === currentUserEmail) {
+                        if(document.getElementById('chatsSection').classList.contains('active')) {
+                            renderChatList(); // 刷新外层列表
+                        }
+                        if(document.getElementById('chatRoomModal').classList.contains('open')) {
+                            if(msg.post_id === activeChatContext.postId) {
+                                loadMessagesForCurrentRoom(); // 刷新内部对话框
+                            }
+                        }
+                    }
+                }).subscribe();
+        }
+
+        // --- 保持不变的辅助功能 ---
+
         function adminLogin() {
             if (document.getElementById('adminPwd').value === "051218") {
                 isAdmin = true;
@@ -354,10 +573,20 @@
 
         async function checkSession() {
             const { data: { session } } = await _supabase.auth.getSession();
-            if (session) updateLoginState(true, session.user.email);
+            if (session) {
+                currentUserEmail = session.user.email;
+                updateLoginState(true, session.user.email);
+                subscribeToMessages(); // 登录后启动消息监听
+            }
             _supabase.auth.onAuthStateChange((event, session) => {
-                if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) { updateLoginState(true, session.user.email); }
-                else if (event === 'SIGNED_OUT') { updateLoginState(false, null); }
+                if (session) { 
+                    currentUserEmail = session.user.email;
+                    updateLoginState(true, session.user.email); 
+                    subscribeToMessages();
+                } else { 
+                    currentUserEmail = null;
+                    updateLoginState(false, null); 
+                }
             });
         }
 
@@ -388,6 +617,7 @@
                 myPosts = myPosts.filter(pId => String(pId) !== String(id));
                 localStorage.setItem('my_posts', JSON.stringify(myPosts));
                 alert("删除成功！"); closeModal(); load();
+                if (document.getElementById('mineSection').classList.contains('active')) renderMine();
             } catch (e) { console.log("Delete error:", e); }
         }
 
@@ -448,13 +678,33 @@
             render(tab + 'List', filtered, type);
         }
         function viewImage(url) { document.getElementById('viewedImg').src = url; document.getElementById('imgViewer').style.display = 'flex'; }
+        
+        // 增强版：处理顶部导航栏切换
         function switchSection(id) {
-            document.querySelectorAll('.content-section, .nav-link').forEach(el => el.classList.remove('active'));
-            document.getElementById(id + 'Section').classList.add('active');
-            document.getElementById('nav-' + id).classList.add('active');
+            // 如果点击的是需要身份验证的板块（我的、消息），先检测环境
+            if (id === 'mine' || id === 'chats') {
+                checkEnvironment().then(envOk => {
+                    if(envOk && isLogin) {
+                        doSwitch(id);
+                    } else if (envOk && !isLogin) {
+                        alert("请先建立云连接验证身份");
+                        openAuthModal();
+                    }
+                });
+            } else {
+                doSwitch(id);
+            }
+            
+            function doSwitch(targetId) {
+                document.querySelectorAll('.content-section, .nav-link').forEach(el => el.classList.remove('active'));
+                document.getElementById(targetId + 'Section').classList.add('active');
+                document.getElementById('nav-' + targetId).classList.add('active');
+                
+                if (targetId === 'mine') renderMine();
+                if (targetId === 'chats') renderChatList();
+            }
         }
         
-        // 修改：打开模态框时增加环境校验
         async function openModal(id, skipCheck = false) { 
             if (!skipCheck && id !== 'authModal') {
                 const envOk = await checkEnvironment();
@@ -468,9 +718,7 @@
         window.onload = async () => { 
             await checkSession(); 
             const userIP = await getIP();
-            if (!isIPInRange(userIP)) {
-                // 不再自动强制弹窗，允许浏览，但操作时会拦截
-            }
+            // 不自动阻断主页浏览
             await load(); 
         };
     </script>
