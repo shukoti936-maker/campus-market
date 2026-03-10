@@ -111,7 +111,7 @@
             <h3 style="margin-bottom: 10px;">身份验证</h3>
             <div id="ipStatus" class="ip-tip">正在检测接入环境...</div>
             <div id="loginFormArea">
-                <p style="font-size: 12px; color: #666; margin-bottom: 20px;">首次登录后，三个月内免重复验证</p>
+                <p style="font-size: 12px; color: #666; margin-bottom: 20px;">使用校园网接入后即可解锁查看与发布功能</p>
                 <div id="emailBox" style="display: none;">
                     <input type="email" id="emailInput" placeholder="输入邮箱获取验证码" style="text-align:center;">
                     <button class="btn-main" id="sendEmailBtn" onclick="handleEmailLogin()" style="width:100%; margin-top:15px;">发送验证码</button>
@@ -156,58 +156,53 @@
         let localFiles = { store_m: [], store_c: [], store_j: [] };
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
 
+        // --- 【核心增强修改】：放宽网段识别范围 ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
-            if (ip.includes(':')) return ip.toLowerCase().startsWith('240c:ca0d');
+            
+            // 1. 兼容手机端 IPv6 (以你学校的 240c:ca0d 开头)
+            if (ip.includes(':')) {
+                return ip.toLowerCase().startsWith('240c:ca0d');
+            }
+
+            // 2. 兼容电脑端 IPv4
             const parts = ip.split('.');
             if(parts.length !== 4) return false;
             const p = parts.map(Number);
+
+            // A. 教育网段 (电脑图片显示的 210.44.95.x)
             if (p[0] === 210 && p[1] === 44 && (p[2] === 94 || p[2] === 95)) return true;
-            if (p[0] === 112 && p[1] === 253) return true;
+            
+            // B. 联通/公网出口段 (包含原有的 112.253 和你新发现的 112.224)
+            if (p[0] === 112 && (p[1] === 253 || p[1] === 224)) return true;
+
             return false; 
         }
         
-        // --- 【极速网络检测核心】：使用并发请求，彻底解决手机端点击卡顿问题 ---
+        // --- 【安全获取】：防 Safari 拦截补充接口 ---
         async function getIP() { 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒极限超时
+            const apis = [
+                { url: 'https://api.ipify.org?format=json', key: 'ip' }, // 优先获取 IPv4
+                { url: 'https://api64.ipify.org?format=json', key: 'ip' }, // 兼容获取 IPv6
+                { url: 'https://v4.ident.me/.json', key: 'address' },
+                { url: 'https://freeipapi.com/api/json', key: 'ipAddress' } // 防 Safari 拦截备用接口
+            ];
             
-            try {
-                // 并发请求，腾讯接口国内访问通常小于100ms，谁先返回就用谁
-                const fetchQQ = fetch('https://vv.video.qq.com/checktime?otype=json', { signal: controller.signal })
-                    .then(r => r.text())
-                    .then(text => {
-                        const match = text.match(/"ip":"([^"]+)"/);
-                        if (match) return match[1];
-                        throw new Error('Not found');
-                    });
-                const fetchIpify = fetch('https://api.ipify.org?format=json', { signal: controller.signal })
-                    .then(r => r.json())
-                    .then(d => d.ip || Promise.reject());
-                const fetchIdent = fetch('https://v4.ident.me/.json', { signal: controller.signal })
-                    .then(r => r.json())
-                    .then(d => d.address || Promise.reject());
-
-                const ip = await Promise.any([fetchQQ, fetchIpify, fetchIdent]);
-                clearTimeout(timeoutId);
-                return ip;
-            } catch (e) {
-                return null; 
+            for (let api of apis) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 4000);
+                    const response = await fetch(api.url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    const d = await response.json();
+                    const ip = d[api.key] || d.address || d.query || d.ipAddress;
+                    if (ip) return ip;
+                } catch (e) { continue; }
             }
+            return null; 
         }
 
-        // --- 实时环境守卫：每次点击关键按钮时进行极速二次校验 ---
-        async function checkEnvironment() {
-            const userIP = await getIP();
-            if (!isIPInRange(userIP) && !isAdmin) {
-                alert("⚠️ 网络环境异常：\n检测到您当前未连接校园网（可能在使用流量）。\n为保障校园信息安全，请重新连接校园WiFi后再查看详情或发布！");
-                openAuthModal();
-                return false;
-            }
-            return true;
-        }
-
-        // 行程发布过期一天（24小时）后再判定过期并自动删除
+        // 修改1：拼车过期判断改为 24小时后
         function isCarpoolExpired(timeStr) {
             if (!timeStr) return false;
             try {
@@ -219,14 +214,26 @@
                 }
                 if (isNaN(postTime.getTime())) return false;
                 
-                // 过期时间 = 设定的出发时间 + 24小时 (86400000毫秒)
-                const expireTime = postTime.getTime() + 86400000;
+                // 过期时间 = 设定的出发时间 + 24小时
+                const expireTime = postTime.getTime() + (24 * 60 * 60 * 1000);
                 return new Date().getTime() > expireTime;
             } catch(e) { return false; }
         }
+
+        // 核心修改：实时环境检测工具
+        async function checkEnvironment() {
+            const userIP = await getIP();
+            const isInRange = isIPInRange(userIP);
+            if (!isInRange && !isAdmin) {
+                alert("⚠️ 接入环境异常：\n您当前正在使用外部网络（流量或外网WiFi）。\n根据校园安全要求，查看详情与发布功能必须在校园网环境下使用。");
+                openAuthModal();
+                return false;
+            }
+            return true;
+        }
         
         async function openAuthModal() {
-            openModal('authModal', true); 
+            openModal('authModal', true); // 特殊标记，不检查环境直接打开
             const statusBox = document.getElementById('ipStatus');
             const emailBox = document.getElementById('emailBox');
             const loginArea = document.getElementById('loginFormArea');
@@ -258,12 +265,11 @@
         }
 
         async function showDetail(type, index) {
-            if (!isLogin) { alert("🔐 请先建立云连接验证身份。"); openAuthModal(); return; }
-            
-            // 【核心防绕过】：就算登录了，用流量点卡片也会被弹回去
+            // 修改2：点击详情前强制检查环境 (拦截流量绕过)
             const envOk = await checkEnvironment();
             if (!envOk) return;
 
+            if (!isLogin) { alert("🔐 请先建立云连接验证身份。"); openAuthModal(); return; }
             const item = globalData[type][index];
             const content = document.getElementById('detailContent');
             const myPosts = JSON.parse(localStorage.getItem('my_posts') || '[]');
@@ -286,16 +292,15 @@
                 </div>
                 ${canDelete ? `<button class="del-btn" onclick="deletePost('${item.id}', '${type}')">🗑️ 删除发布 (仅作者可见)</button>` : ''}
             `;
-            openModal('detailModal', true);
+            openModal('detailModal');
         }
 
         async function submit(type) {
-            if(!isLogin) return alert("请先验证身份！");
-            
-            // 【核心防绕过】：点击发布按钮时，强制校验IP环境
+            // 修改3：发布前强制检查环境 (拦截流量绕过)
             const envOk = await checkEnvironment();
             if (!envOk) return;
 
+            if(!isLogin) return alert("请先验证身份！");
             const btn = event.target;
             const originalText = btn.innerText;
             btn.innerText = "正在发布..."; btn.disabled = true;
@@ -325,6 +330,7 @@
             } catch (e) { alert("发布失败: " + e.message); btn.disabled = false; btn.innerText = originalText; }
         }
 
+        // --- 以下为保持不变的原始逻辑代码 ---
         function adminLogin() {
             if (document.getElementById('adminPwd').value === "051218") {
                 isAdmin = true;
@@ -390,7 +396,6 @@
             const { data: c } = await _supabase.from('Carpool').select('*').order('created_at', {ascending:false});
             const { data: j } = await _supabase.from('Job').select('*').order('created_at', {ascending:false});
             
-            // 只要一加载，遇到过期超过1天的记录直接执行清除
             if(c) {
                 for (let item of c) {
                     if(isCarpoolExpired(item.time)) {
@@ -449,6 +454,7 @@
             document.getElementById('nav-' + id).classList.add('active');
         }
         
+        // 修改：打开模态框时增加环境校验
         async function openModal(id, skipCheck = false) { 
             if (!skipCheck && id !== 'authModal') {
                 const envOk = await checkEnvironment();
@@ -461,7 +467,10 @@
         
         window.onload = async () => { 
             await checkSession(); 
-            // 首次进入只默默拉取数据，让用户自由滚动主页面，不强制阻断
+            const userIP = await getIP();
+            if (!isIPInRange(userIP)) {
+                // 不再自动强制弹窗，允许浏览，但操作时会拦截
+            }
             await load(); 
         };
     </script>
