@@ -72,14 +72,13 @@
         .chat-thread-card p { font-size: 12px; color: #888; }
         
         .chat-box { flex-grow: 1; background: #f3f4f6; border-radius: 8px; padding: 15px; overflow-y: auto; margin: 10px 0; display: flex; flex-direction: column; gap: 10px; min-height: 300px; max-height: 50vh; }
-        .msg-bubble { max-width: 75%; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-bubble { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
         .msg-left { background: white; color: #333; border: 1px solid #eee; border-top-left-radius: 2px; }
         .msg-right { background: #95ec69; color: #333; border-top-right-radius: 2px; }
         .msg-time { font-size: 10px; color: #aaa; text-align: center; margin: 5px 0; }
         
         .empty-state { text-align: center; padding: 40px 20px; color: #999; font-size: 14px; }
 
-        /* 新增：消息红点提醒样式 */
         .red-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background-color: var(--danger); border-radius: 50%; display: none; }
     </style>
 </head>
@@ -181,7 +180,7 @@
                 </div>
             <div style="display:flex; gap:10px; margin-top: 10px;">
                 <input type="text" id="chatMsgInput" placeholder="输入消息..." style="margin:0; flex-grow:1; padding: 10px; border-radius: 6px;">
-                <button class="btn-main" onclick="sendChatMessage()" style="white-space: nowrap; border-radius: 6px;">发送</button>
+                <button id="sendChatBtn" class="btn-main" onclick="sendChatMessage()" style="white-space: nowrap; border-radius: 6px;">发送</button>
             </div>
         </div>
     </div>
@@ -207,7 +206,7 @@
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
         let activeChatContext = { postId: null, postTitle: null, receiverEmail: null };
 
-        // --- 原封不动的IP验证防线 ---
+        // --- 核心防线：IP段判断（包含了你所有的校园网和联通网段） ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
             if (ip.includes(':')) {
@@ -221,12 +220,14 @@
             return false; 
         }
         
+        // --- 最稳定的同步检测通道 ---
         async function getIP() { 
             const apis = [
                 { url: 'https://api.ipify.org?format=json', key: 'ip' },
                 { url: 'https://api64.ipify.org?format=json', key: 'ip' },
                 { url: 'https://v4.ident.me/.json', key: 'address' }
             ];
+            
             for (let api of apis) {
                 try {
                     const controller = new AbortController();
@@ -252,6 +253,7 @@
                     postTime = new Date(today + " " + timeStr);
                 }
                 if (isNaN(postTime.getTime())) return false;
+                
                 const expireTime = postTime.getTime() + (24 * 60 * 60 * 1000);
                 return new Date().getTime() > expireTime;
             } catch(e) { return false; }
@@ -314,7 +316,6 @@
             const images = Array.isArray(item.images) ? item.images : [];
             const titleText = item.name || item.route || item.title;
 
-            // 按钮逻辑不变，一直显示聊天入口
             let chatButtonHtml = '';
             if (isOwner) {
                 chatButtonHtml = `<button class="btn-chat" style="background:#ccc; cursor:not-allowed;" disabled>💬 这是您自己发布的信息</button>`;
@@ -418,7 +419,7 @@
             `}).join('');
         }
 
-        // --- 修复点：彻底改写查询逻辑，避开邮箱特殊符号引发的解析失败 ---
+        // 渲染“消息”板块列表
         async function renderChatList() {
             const container = document.getElementById('chatsListContainer');
             if(!isLogin || !currentUserEmail) {
@@ -428,17 +429,19 @@
             container.innerHTML = `<div style="text-align:center; color:#999; padding:20px;">加载对话中...</div>`;
             
             try {
-                // 安全获取：拉取所有消息后通过纯前端进行过滤，100%防止邮箱符号阻断查询
                 const { data, error } = await _supabase.from('Messages')
                     .select('*')
                     .order('created_at', { ascending: false });
                 
                 if(error) throw error;
                 
-                // 前端精准过滤出“发给我的”或“我发出的”消息
-                const myMessages = data.filter(msg => 
-                    msg.sender_email === currentUserEmail || msg.receiver_email === currentUserEmail
-                );
+                // 【修复】：使用安全的 toLowerCase 保证不遗漏任何消息
+                const myEmailLower = currentUserEmail.toLowerCase();
+                const myMessages = data.filter(msg => {
+                    const sender = msg.sender_email ? msg.sender_email.toLowerCase() : '';
+                    const receiver = msg.receiver_email ? msg.receiver_email.toLowerCase() : '';
+                    return sender === myEmailLower || receiver === myEmailLower;
+                });
 
                 if(!myMessages || myMessages.length === 0) {
                     container.innerHTML = `<div class="empty-state">📭 暂无对话记录。去浏览商品联系一下吧！</div>`;
@@ -447,8 +450,10 @@
 
                 let chatThreads = {};
                 myMessages.forEach(msg => {
-                    const otherPerson = msg.sender_email === currentUserEmail ? msg.receiver_email : msg.sender_email;
-                    const threadKey = `${msg.post_id}_${otherPerson}`;
+                    const senderLower = msg.sender_email.toLowerCase();
+                    const otherPerson = senderLower === myEmailLower ? msg.receiver_email : msg.sender_email;
+                    const threadKey = `${msg.post_id}_${otherPerson.toLowerCase()}`;
+                    
                     if (!chatThreads[threadKey]) {
                         chatThreads[threadKey] = {
                             postId: msg.post_id,
@@ -481,7 +486,7 @@
             if (!envOk) return;
             if(!isLogin) return alert("请先建立连接！");
             
-            activeChatContext = { postId, postTitle, receiverEmail };
+            activeChatContext = { postId: String(postId), postTitle, receiverEmail };
             
             document.getElementById('chatRoomTitle').innerText = `💬 与 ${receiverEmail.split('@')[0]} 的对话\n(关于: ${postTitle})`;
             document.getElementById('chatBoxContent').innerHTML = `<div class="empty-state">正在加载历史消息...</div>`;
@@ -490,42 +495,52 @@
             loadMessagesForCurrentRoom();
         }
 
-        // --- 修复点：微信级聊天框，并使用纯前端过滤历史消息 ---
+        // 【修复】：微信级 UI，显式标注用户头像与名字，过滤大小写敏感与字符串格式问题
         async function loadMessagesForCurrentRoom() {
             if(!activeChatContext.postId) return;
             const { postId, receiverEmail } = activeChatContext;
             
             const { data, error } = await _supabase.from('Messages')
                 .select('*')
-                .eq('post_id', postId)
                 .order('created_at', { ascending: true });
                 
             const chatBox = document.getElementById('chatBoxContent');
             if(error) { chatBox.innerHTML = `<div class="empty-state">加载失败</div>`; return; }
             
-            // 精准锁定当前两人的对话记录
-            const validData = data.filter(msg => 
-                (msg.sender_email === currentUserEmail && msg.receiver_email === receiverEmail) ||
-                (msg.sender_email === receiverEmail && msg.receiver_email === currentUserEmail)
-            );
+            const myEmailLower = currentUserEmail.toLowerCase();
+            const targetEmailLower = receiverEmail.toLowerCase();
+            const targetPostId = String(postId);
+
+            const validData = data.filter(msg => {
+                if (String(msg.post_id) !== targetPostId) return false;
+                const sender = msg.sender_email ? msg.sender_email.toLowerCase() : '';
+                const receiver = msg.receiver_email ? msg.receiver_email.toLowerCase() : '';
+                return (sender === myEmailLower && receiver === targetEmailLower) ||
+                       (sender === targetEmailLower && receiver === myEmailLower);
+            });
             
             if(validData.length === 0) {
                 chatBox.innerHTML = `<div class="msg-time">暂无聊天记录，开始打个招呼吧！</div>`;
             } else {
                 chatBox.innerHTML = validData.map(msg => {
-                    const isMe = msg.sender_email === currentUserEmail;
-                    // 提取首字母作为头像
+                    const senderLower = msg.sender_email ? msg.sender_email.toLowerCase() : '';
+                    const isMe = senderLower === myEmailLower;
+                    
                     const avatarStr = msg.sender_email ? msg.sender_email.charAt(0).toUpperCase() : '?';
-                    const avatarBg = isMe ? '#10b981' : '#ccc'; 
+                    const avatarBg = isMe ? '#10b981' : '#4f46e5'; // 微信配色区分
+                    const displayUserName = msg.sender_email ? msg.sender_email.split('@')[0] : '未知用户';
                     
                     return `
-                        <div style="display:flex; flex-direction:column; width:100%; margin-bottom:8px;">
+                        <div style="display:flex; flex-direction:column; width:100%; margin-bottom:15px;">
                             <div class="msg-time">${new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                             <div style="display:flex; ${isMe ? 'flex-direction:row-reverse;' : ''} gap:10px; align-items:flex-start;">
                                 <div style="width:36px; height:36px; border-radius:6px; background:${avatarBg}; color:white; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:bold; flex-shrink:0;">
                                     ${avatarStr}
                                 </div>
-                                <div class="msg-bubble ${isMe ? 'msg-right' : 'msg-left'}">${msg.content}</div>
+                                <div style="display:flex; flex-direction:column; max-width:75%; ${isMe ? 'align-items:flex-end;' : 'align-items:flex-start;'}">
+                                    <span style="font-size:11px; color:#888; margin-bottom:4px; padding:0 4px;">${displayUserName}</span>
+                                    <div class="msg-bubble ${isMe ? 'msg-right' : 'msg-left'}">${msg.content}</div>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -534,13 +549,17 @@
             chatBox.scrollTop = chatBox.scrollHeight; 
         }
 
-        // 发送消息
+        // 发送消息防连点
         async function sendChatMessage() {
             const input = document.getElementById('chatMsgInput');
+            const btn = document.getElementById('sendChatBtn');
             const text = input.value.trim();
             if(!text || !activeChatContext.postId) return;
             
             input.value = ''; 
+            btn.disabled = true;
+            btn.innerText = '...';
+            
             try {
                 await _supabase.from('Messages').insert([{
                     post_id: activeChatContext.postId,
@@ -549,37 +568,40 @@
                     receiver_email: activeChatContext.receiverEmail,
                     content: text
                 }]);
+                // 发送成功后刷新
                 loadMessagesForCurrentRoom();
-            } catch(e) { alert("发送失败!"); }
+            } catch(e) { 
+                alert("发送失败!"); 
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '发送';
+            }
         }
 
         // 监听实时消息推送 & 红点逻辑
         function subscribeToMessages() {
             if(!currentUserEmail) return;
+            const myEmailLower = currentUserEmail.toLowerCase();
+            
             _supabase.channel('public:Messages')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Messages' }, payload => {
                     const msg = payload.new;
+                    const receiverLower = msg.receiver_email ? msg.receiver_email.toLowerCase() : '';
+                    const senderLower = msg.sender_email ? msg.sender_email.toLowerCase() : '';
                     
-                    // 判断这条消息是不是给我的
-                    if(msg.receiver_email === currentUserEmail) {
+                    if(receiverLower === myEmailLower || senderLower === myEmailLower) {
                         const isChatsTabActive = document.getElementById('chatsSection').classList.contains('active');
                         const isChatRoomOpen = document.getElementById('chatRoomModal').classList.contains('open');
-                        const isCurrentRoom = msg.post_id === activeChatContext.postId;
+                        const isCurrentRoom = String(msg.post_id) === String(activeChatContext.postId);
 
                         if (isChatRoomOpen && isCurrentRoom) {
-                            // 我正在和这个人聊天，直接拉取新消息
                             loadMessagesForCurrentRoom();
                         } else if (isChatsTabActive) {
-                            // 我在消息列表界面，刷新列表并亮起红点
                             renderChatList(); 
-                            document.getElementById('chatRedDot').style.display = 'block';
+                            if (receiverLower === myEmailLower) document.getElementById('chatRedDot').style.display = 'block';
                         } else {
-                            // 我在浏览别的板块，仅亮起红点
-                            document.getElementById('chatRedDot').style.display = 'block';
+                            if (receiverLower === myEmailLower) document.getElementById('chatRedDot').style.display = 'block';
                         }
-                    } else if (msg.sender_email === currentUserEmail) {
-                        // 这是我发出去的，如果是多开窗口测试用的刷新逻辑
-                        if(document.getElementById('chatsSection').classList.contains('active')) renderChatList(); 
                     }
                 }).subscribe();
         }
