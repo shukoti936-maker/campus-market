@@ -66,13 +66,19 @@
         .ip-fail { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
         .retry-link { color: #4f46e5; text-decoration: underline; cursor: pointer; margin-top: 5px; font-weight: bold; }
 
-        /* 聊天相关增强样式 */
-        .chat-thread-card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; border-left: 4px solid var(--primary); }
-        .chat-thread-card h4 { margin-bottom: 5px; color: #333; }
-        .chat-thread-card p { font-size: 12px; color: #888; }
+        /* 聊天列表与对话框样式 */
+        .chat-thread-card { display: flex; background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; position: relative; align-items: center; gap: 12px; }
+        .chat-thread-card:hover { transform: translateY(-2px); transition: 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+        .chat-thumb { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: #eee; flex-shrink: 0; }
+        .chat-info { flex-grow: 1; overflow: hidden; }
+        .chat-info h4 { margin-bottom: 5px; color: #333; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-info p { font-size: 13px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+        .chat-meta { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; min-width: 60px; }
+        .chat-time { font-size: 11px; color: #999; margin-bottom: 5px; }
+        .unread-badge { background: var(--danger); color: white; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
         
         .chat-box { flex-grow: 1; background: #f3f4f6; border-radius: 8px; padding: 15px; overflow-y: auto; margin: 10px 0; display: flex; flex-direction: column; gap: 10px; min-height: 300px; max-height: 50vh; }
-        .msg-bubble { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-bubble { max-width: 75%; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
         .msg-left { background: white; color: #333; border: 1px solid #eee; border-top-left-radius: 2px; }
         .msg-right { background: #95ec69; color: #333; border-top-right-radius: 2px; }
         .msg-time { font-size: 10px; color: #aaa; text-align: center; margin: 5px 0; }
@@ -206,10 +212,9 @@
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
         let activeChatContext = { postId: null, postTitle: null, receiverEmail: null };
 
-        // 核心修复1：添加一次性缓存机制，只要验证通过一次，就不会再去反复请求通道，杜绝超时卡顿！
         let isEnvVerified = false; 
 
-        // --- 原封不动的IP验证防线 ---
+        // --- IP检测保持完全原状 ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
             if (ip.includes(':')) {
@@ -223,14 +228,12 @@
             return false; 
         }
         
-        // --- 原封不动的通道，但在调用逻辑上被缓存保护了 ---
         async function getIP() { 
             const apis = [
                 { url: 'https://api.ipify.org?format=json', key: 'ip' },
                 { url: 'https://api64.ipify.org?format=json', key: 'ip' },
                 { url: 'https://v4.ident.me/.json', key: 'address' }
             ];
-            
             for (let api of apis) {
                 try {
                     const controller = new AbortController();
@@ -245,7 +248,6 @@
             return null; 
         }
 
-        // 拼车过期判断 24小时
         function isCarpoolExpired(timeStr) {
             if (!timeStr) return false;
             try {
@@ -256,15 +258,13 @@
                     postTime = new Date(today + " " + timeStr);
                 }
                 if (isNaN(postTime.getTime())) return false;
-                
                 const expireTime = postTime.getTime() + (24 * 60 * 60 * 1000);
                 return new Date().getTime() > expireTime;
             } catch(e) { return false; }
         }
 
-        // 核心修复2：带缓存的环境检测
         async function checkEnvironment() {
-            if (isEnvVerified) return true; // 如果已经验证过，直接秒速放行！
+            if (isEnvVerified) return true; 
 
             const userIP = await getIP();
             const isInRange = isIPInRange(userIP);
@@ -273,7 +273,7 @@
                 openAuthModal();
                 return false;
             }
-            isEnvVerified = true; // 验证成功后打上绿卡标记
+            isEnvVerified = true; 
             return true;
         }
         
@@ -290,7 +290,7 @@
             
             const userIP = await getIP();
             if (isIPInRange(userIP)) {
-                isEnvVerified = true; // 弹窗里验证成功也记为成功
+                isEnvVerified = true; 
                 statusBox.innerHTML = `✅ 认证成功！<br>当前校园网接入: ${userIP}`;
                 statusBox.className = "ip-tip ip-success";
                 if(!isLogin) {
@@ -365,7 +365,6 @@
                 let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
                 const imgUrls = [];
                 for(let f of localFiles[key]) {
-                    // 核心修复3：强制将图片名转为英文字符时间戳，完美解决中文名空壳导致无法上传的Bug！
                     const ext = f.name.includes('.') ? f.name.split('.').pop() : 'png';
                     const fname = `public/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
                     await _supabase.storage.from('images').upload(fname, f);
@@ -397,7 +396,6 @@
             } catch (e) { alert("发布失败: " + e.message); btn.disabled = false; btn.innerText = originalText; }
         }
 
-        // 渲染“我的”板块
         function renderMine() {
             const container = document.getElementById('mineList');
             const myPostIds = JSON.parse(localStorage.getItem('my_posts') || '[]');
@@ -428,7 +426,26 @@
             `}).join('');
         }
 
-        // 渲染“消息”板块列表
+        // --- 核心优化：增加缩略图、最新时间、未读数量提取 ---
+        function getPostImageById(postId) {
+            // 在所有加载好的全局数据里找匹配的ID，返回第一张图片
+            for(let type of ['Market', 'Carpool', 'Job']) {
+                let match = globalData[type].find(item => String(item.id) === String(postId));
+                if (match && match.images && match.images.length > 0) return match.images[0];
+            }
+            return PLACEHOLDER;
+        }
+
+        function formatMsgTime(isoString) {
+            const date = new Date(isoString);
+            const today = new Date();
+            if (date.toDateString() === today.toLocaleDateString()) {
+                return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); // 今天只显示时间
+            } else {
+                return `${date.getMonth()+1}/${date.getDate()}`; // 非今天显示日期
+            }
+        }
+
         async function renderChatList() {
             const container = document.getElementById('chatsListContainer');
             if(!isLogin || !currentUserEmail) {
@@ -459,6 +476,7 @@
                 let chatThreads = {};
                 myMessages.forEach(msg => {
                     const senderLower = msg.sender_email.toLowerCase();
+                    const receiverLower = msg.receiver_email.toLowerCase();
                     const otherPerson = senderLower === myEmailLower ? msg.receiver_email : msg.sender_email;
                     const threadKey = `${msg.post_id}_${otherPerson.toLowerCase()}`;
                     
@@ -468,27 +486,44 @@
                             postTitle: msg.post_title,
                             otherPerson: otherPerson,
                             lastMsg: msg.content,
-                            time: new Date(msg.created_at).toLocaleString()
+                            time: msg.created_at, // 保存完整时间排序用
+                            unreadCount: 0,
+                            thumb: getPostImageById(msg.post_id) // 获取缩略图
                         };
+                    }
+                    
+                    // 统计未读（发给我的，且 is_read 为 false，如果后端没加这个字段默认为假不计或前端容错处理，这里通过时间标记简易红点）
+                    // 假设只要是发给我的，且在我们打开聊天框之前产生的都暂算未读逻辑，为了稳定起见，我们暂且把“最后一条是别人发给我的”算作有新动态。
+                    // 严谨做法：这里假设如果最新的消息是对方发的，就算有动态。
+                    if (chatThreads[threadKey].time === msg.created_at && senderLower !== myEmailLower) {
+                        chatThreads[threadKey].unreadCount = 1; 
                     }
                 });
 
-                container.innerHTML = Object.values(chatThreads).map(thread => `
+                container.innerHTML = Object.values(chatThreads).map(thread => {
+                    const timeDisplay = formatMsgTime(thread.time);
+                    const unreadHtml = thread.unreadCount > 0 ? `<div class="unread-badge">新</div>` : '';
+                    
+                    return `
                     <div class="chat-thread-card" onclick="openChatWindow('${thread.postId}', '${thread.postTitle}', '${thread.otherPerson}')">
-                        <h4 style="font-size:14px; margin-bottom:6px;">📦 关于：${thread.postTitle}</h4>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:13px; color:#555; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:65%;">💬 ${thread.lastMsg}</span>
-                            <span style="font-size:11px; color:#999;">联系人: ${thread.otherPerson.split('@')[0]}</span>
+                        <img src="${thread.thumb}" class="chat-thumb" onerror="this.src='${PLACEHOLDER}'">
+                        <div class="chat-info">
+                            <h4>关于：${thread.postTitle}</h4>
+                            <p>💬 ${thread.lastMsg}</p>
+                            <p style="font-size:10px; color:#aaa; margin-top:2px;">联系人: ${thread.otherPerson.split('@')[0]}</p>
+                        </div>
+                        <div class="chat-meta">
+                            <span class="chat-time">${timeDisplay}</span>
+                            ${unreadHtml}
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
 
             } catch(e) {
-                container.innerHTML = `<div class="empty-state">无法加载消息：${e.message}<br>请确保已在 Supabase 开启 Messages 表读取权限。</div>`;
+                container.innerHTML = `<div class="empty-state">无法加载消息：${e.message}</div>`;
             }
         }
 
-        // 打开具体的聊天房间
         async function openChatWindow(postId, postTitle, receiverEmail) {
             const envOk = await checkEnvironment();
             if (!envOk) return;
@@ -503,7 +538,6 @@
             loadMessagesForCurrentRoom();
         }
 
-        // 微信级 UI，显式标注用户头像与名字
         async function loadMessagesForCurrentRoom() {
             if(!activeChatContext.postId) return;
             const { postId, receiverEmail } = activeChatContext;
@@ -535,7 +569,7 @@
                     const isMe = senderLower === myEmailLower;
                     
                     const avatarStr = msg.sender_email ? msg.sender_email.charAt(0).toUpperCase() : '?';
-                    const avatarBg = isMe ? '#10b981' : '#4f46e5'; // 微信配色区分
+                    const avatarBg = isMe ? '#10b981' : '#4f46e5'; 
                     const displayUserName = msg.sender_email ? msg.sender_email.split('@')[0] : '未知用户';
                     
                     return `
@@ -555,9 +589,11 @@
                 }).join('');
             }
             chatBox.scrollTop = chatBox.scrollHeight; 
+            
+            // 看完后清除导航栏红点
+            document.getElementById('chatRedDot').style.display = 'none';
         }
 
-        // 发送消息防连点
         async function sendChatMessage() {
             const input = document.getElementById('chatMsgInput');
             const btn = document.getElementById('sendChatBtn');
@@ -576,7 +612,6 @@
                     receiver_email: activeChatContext.receiverEmail,
                     content: text
                 }]);
-                // 发送成功后刷新
                 loadMessagesForCurrentRoom();
             } catch(e) { 
                 alert("发送失败!"); 
@@ -586,7 +621,6 @@
             }
         }
 
-        // 监听实时消息推送 & 红点逻辑
         function subscribeToMessages() {
             if(!currentUserEmail) return;
             const myEmailLower = currentUserEmail.toLowerCase();
@@ -614,7 +648,6 @@
                 }).subscribe();
         }
 
-        // --- 保持不变的辅助功能 ---
         function adminLogin() {
             if (document.getElementById('adminPwd').value === "051218") {
                 isAdmin = true;
@@ -623,7 +656,6 @@
             } else { alert("调试码错误"); }
         }
 
-        // 核心修复4：去掉了会导致视觉误判的清空代码
         function handleImgs(input, preId, key) {
             Array.from(input.files).forEach(f => {
                 localFiles[key].push(f);
@@ -745,8 +777,6 @@
         function viewImage(url) { document.getElementById('viewedImg').src = url; document.getElementById('imgViewer').style.display = 'flex'; }
         
         function switchSection(id) {
-            if (id === 'chats') document.getElementById('chatRedDot').style.display = 'none';
-
             if (id === 'mine' || id === 'chats') {
                 checkEnvironment().then(envOk => {
                     if(envOk && isLogin) {
@@ -766,7 +796,10 @@
                 document.getElementById('nav-' + targetId).classList.add('active');
                 
                 if (targetId === 'mine') renderMine();
-                if (targetId === 'chats') renderChatList();
+                if (targetId === 'chats') {
+                    renderChatList();
+                    document.getElementById('chatRedDot').style.display = 'none'; // 点进消息板块就消红点
+                }
             }
         }
         
