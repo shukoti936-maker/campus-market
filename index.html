@@ -229,25 +229,48 @@
             return false; 
         }
         
+        // --- 核心修改：并发获取 + 15秒微缓存，告别卡顿 ---
+        let cachedIP = null;
+        let lastIPCheckTime = 0;
+        const CACHE_DURATION = 15000; // 15秒微缓存，既能防切流量，又能保证丝滑点击
+
         async function getIP() { 
+            const now = Date.now();
+            if (cachedIP && (now - lastIPCheckTime < CACHE_DURATION)) {
+                return cachedIP;
+            }
+
             const apis = [
                 { url: 'https://api.ipify.org?format=json', key: 'ip' },
                 { url: 'https://api64.ipify.org?format=json', key: 'ip' },
                 { url: 'https://v4.ident.me/.json', key: 'address' }
             ];
             
-            for (let api of apis) {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 4000);
-                    const response = await fetch(api.url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                    const d = await response.json();
-                    const ip = d[api.key] || d.address || d.query;
-                    if (ip) return ip;
-                } catch (e) { continue; }
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2500); // 整体超时缩短为2.5秒
+
+                // Promise.any 实现并发竞速：哪个 API 先返回就用哪个，不再串行等待死请求
+                const fetchPromises = apis.map(api =>
+                    fetch(api.url, { signal: controller.signal })
+                        .then(res => res.json())
+                        .then(d => {
+                            const ip = d[api.key] || d.address || d.query;
+                            if (ip) return ip;
+                            throw new Error('Invalid IP structure');
+                        })
+                );
+
+                const ip = await Promise.any(fetchPromises);
+                clearTimeout(timeoutId);
+                
+                cachedIP = ip;
+                lastIPCheckTime = Date.now();
+                return ip;
+            } catch (e) { 
+                // 如果全都失败（网络断开或被墙），优先返回上一秒的缓存，或者 null
+                return cachedIP || null; 
             }
-            return null; 
         }
 
         function isCarpoolExpired(timeStr) {
@@ -266,12 +289,11 @@
             } catch(e) { return false; }
         }
 
-        // --- 核心修改：移除缓存验证，每次操作强制实时检测网络环境 ---
         async function checkEnvironment() {
             const userIP = await getIP();
             const isInRange = isIPInRange(userIP);
             if (!isInRange && !isAdmin) {
-                alert("⚠️ 检测到您的网络环境已改变！\n请切换回校园网环境后，再重新尝试操作。");
+                alert("⚠️ 检测到您的网络环境异常或已改变！\n请切换回校园网环境后，再重新尝试操作。");
                 openAuthModal();
                 return false;
             }
@@ -302,7 +324,9 @@
                     userArea.style.display = 'block';
                 }
             } else {
-                statusBox.innerHTML = `🚫 接入受限：必须使用校园网环境<br><span style="font-size:10px; color:#999">(识别到IP: ${userIP || '获取失败'})</span><br><div class="retry-link" onclick="openAuthModal()">点击重试检测</div>`;
+                // 修复：明确显示被识别出来的 IP，或者清晰告知获取失败原因
+                const displayIP = userIP ? userIP : '获取超时/网络连接被拦截';
+                statusBox.innerHTML = `🚫 接入受限：必须使用校园网环境<br><span style="font-size:13px; color:#cf1322; font-weight:bold; margin-top:4px; display:inline-block;">(当前识别IP: ${displayIP})</span><br><div class="retry-link" onclick="openAuthModal()">点击重试检测</div>`;
                 statusBox.className = "ip-tip ip-fail";
                 emailBox.style.display = 'none'; 
                 loginArea.style.display = 'block';
