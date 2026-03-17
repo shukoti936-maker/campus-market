@@ -229,14 +229,15 @@
             return false; 
         }
         
-        // --- 核心修改：并发获取 + 15秒微缓存，告别卡顿 ---
+        // --- 核心修改：并发获取 + 15秒微缓存 + 强制刷新 ---
         let cachedIP = null;
         let lastIPCheckTime = 0;
-        const CACHE_DURATION = 15000; // 15秒微缓存，既能防切流量，又能保证丝滑点击
+        const CACHE_DURATION = 15000; // 15秒微缓存
 
-        async function getIP() { 
+        async function getIP(force = false) { 
             const now = Date.now();
-            if (cachedIP && (now - lastIPCheckTime < CACHE_DURATION)) {
+            // 只有在非强制更新，且缓存没过期的情况下才用缓存
+            if (!force && cachedIP && (now - lastIPCheckTime < CACHE_DURATION)) {
                 return cachedIP;
             }
 
@@ -248,9 +249,8 @@
             
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2500); // 整体超时缩短为2.5秒
+                const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-                // Promise.any 实现并发竞速：哪个 API 先返回就用哪个，不再串行等待死请求
                 const fetchPromises = apis.map(api =>
                     fetch(api.url, { signal: controller.signal })
                         .then(res => res.json())
@@ -268,7 +268,6 @@
                 lastIPCheckTime = Date.now();
                 return ip;
             } catch (e) { 
-                // 如果全都失败（网络断开或被墙），优先返回上一秒的缓存，或者 null
                 return cachedIP || null; 
             }
         }
@@ -300,7 +299,7 @@
             return true;
         }
         
-        async function openAuthModal() {
+        async function openAuthModal(isRetry = false) {
             openModal('authModal', true); 
             const statusBox = document.getElementById('ipStatus');
             const emailBox = document.getElementById('emailBox');
@@ -309,9 +308,12 @@
             
             emailBox.style.display = 'none'; 
             statusBox.className = "ip-tip";
-            statusBox.innerHTML = "⏳ 正在同步校园网准入状态...";
+            // 动态提示文字，如果是重试则显示正在重新连接
+            statusBox.innerHTML = isRetry ? "🔄 正在重新连接并检测..." : "⏳ 正在同步校园网准入状态...";
             
-            const userIP = await getIP();
+            // 传入 isRetry 参数，控制是否强制刷新 IP
+            const userIP = await getIP(isRetry); 
+            
             if (isIPInRange(userIP)) {
                 statusBox.innerHTML = `✅ 认证成功！<br>当前校园网接入: ${userIP}`;
                 statusBox.className = "ip-tip ip-success";
@@ -326,7 +328,8 @@
             } else {
                 // 修复：明确显示被识别出来的 IP，或者清晰告知获取失败原因
                 const displayIP = userIP ? userIP : '获取超时/网络连接被拦截';
-                statusBox.innerHTML = `🚫 接入受限：必须使用校园网环境<br><span style="font-size:13px; color:#cf1322; font-weight:bold; margin-top:4px; display:inline-block;">(当前识别IP: ${displayIP})</span><br><div class="retry-link" onclick="openAuthModal()">点击重试检测</div>`;
+                // 这里修改为传入 true，点击重试时强制刷新
+                statusBox.innerHTML = `🚫 接入受限：必须使用校园网环境<br><span style="font-size:13px; color:#cf1322; font-weight:bold; margin-top:4px; display:inline-block;">(当前识别IP: ${displayIP})</span><br><div class="retry-link" onclick="openAuthModal(true)">点击重试检测</div>`;
                 statusBox.className = "ip-tip ip-fail";
                 emailBox.style.display = 'none'; 
                 loginArea.style.display = 'block';
