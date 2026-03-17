@@ -358,7 +358,9 @@
                 let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
                 const imgUrls = [];
                 for(let f of localFiles[key]) {
-                    const fname = `public/${Date.now()}_${f.name.replace(/[^\x00-\x7F]/g, "")}`;
+                    // 【修复】安全解决因为中文照片名或特殊符号导致截断无法上传的恶性 Bug
+                    const ext = f.name.includes('.') ? f.name.split('.').pop() : 'png';
+                    const fname = `public/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
                     await _supabase.storage.from('images').upload(fname, f);
                     imgUrls.push(_supabase.storage.from('images').getPublicUrl(fname).data.publicUrl);
                 }
@@ -435,7 +437,6 @@
                 
                 if(error) throw error;
                 
-                // 【修复】：使用安全的 toLowerCase 保证不遗漏任何消息
                 const myEmailLower = currentUserEmail.toLowerCase();
                 const myMessages = data.filter(msg => {
                     const sender = msg.sender_email ? msg.sender_email.toLowerCase() : '';
@@ -495,7 +496,7 @@
             loadMessagesForCurrentRoom();
         }
 
-        // 【修复】：微信级 UI，显式标注用户头像与名字，过滤大小写敏感与字符串格式问题
+        // 【修复】微信级 UI，显式标注用户头像与名字，严格精准双向匹配过滤
         async function loadMessagesForCurrentRoom() {
             if(!activeChatContext.postId) return;
             const { postId, receiverEmail } = activeChatContext;
@@ -527,7 +528,7 @@
                     const isMe = senderLower === myEmailLower;
                     
                     const avatarStr = msg.sender_email ? msg.sender_email.charAt(0).toUpperCase() : '?';
-                    const avatarBg = isMe ? '#10b981' : '#4f46e5'; // 微信配色区分
+                    const avatarBg = isMe ? '#10b981' : '#4f46e5'; // 我发的是绿色，对方是蓝色
                     const displayUserName = msg.sender_email ? msg.sender_email.split('@')[0] : '未知用户';
                     
                     return `
@@ -549,7 +550,7 @@
             chatBox.scrollTop = chatBox.scrollHeight; 
         }
 
-        // 发送消息防连点
+        // 发送消息防连点修复
         async function sendChatMessage() {
             const input = document.getElementById('chatMsgInput');
             const btn = document.getElementById('sendChatBtn');
@@ -615,6 +616,7 @@
             } else { alert("调试码错误"); }
         }
 
+        // 【修复】去掉了上传文件后重置input的代码，解决选图后依然显示“未选择”造成的迷惑
         function handleImgs(input, preId, key) {
             Array.from(input.files).forEach(f => {
                 localFiles[key].push(f);
@@ -625,7 +627,7 @@
                 div.onclick = () => { div.remove(); localFiles[key] = localFiles[key].filter(file => file !== f); };
                 document.getElementById(preId).appendChild(div);
             });
-            input.value = '';
+            // 不再使用 input.value = ''; 防止视觉误导
         }
 
         async function checkSession() {
