@@ -226,6 +226,7 @@
             const p = parts.map(Number);
             if (p[0] === 210 && p[1] === 44 && (p[2] === 94 || p[2] === 95)) return true;
             if (p[0] === 112 && p[1] === 253) return true; // 这里去掉了 112.224
+            if (p[0] === 112 && p[1] === 6) return true;   // 新增：放行 112.6 开头的所有 IP 段
             return false; 
         }
         
