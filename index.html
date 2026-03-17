@@ -206,7 +206,10 @@
         const PLACEHOLDER = 'https://via.placeholder.com/300x180?text=No+Image';
         let activeChatContext = { postId: null, postTitle: null, receiverEmail: null };
 
-        // --- 核心防线：IP段判断（包含了你所有的校园网和联通网段） ---
+        // 核心修复1：添加一次性缓存机制，只要验证通过一次，就不会再去反复请求通道，杜绝超时卡顿！
+        let isEnvVerified = false; 
+
+        // --- 原封不动的IP验证防线 ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
             if (ip.includes(':')) {
@@ -220,7 +223,7 @@
             return false; 
         }
         
-        // --- 最稳定的同步检测通道 ---
+        // --- 原封不动的通道，但在调用逻辑上被缓存保护了 ---
         async function getIP() { 
             const apis = [
                 { url: 'https://api.ipify.org?format=json', key: 'ip' },
@@ -259,8 +262,10 @@
             } catch(e) { return false; }
         }
 
-        // 实时环境检测工具
+        // 核心修复2：带缓存的环境检测
         async function checkEnvironment() {
+            if (isEnvVerified) return true; // 如果已经验证过，直接秒速放行！
+
             const userIP = await getIP();
             const isInRange = isIPInRange(userIP);
             if (!isInRange && !isAdmin) {
@@ -268,6 +273,7 @@
                 openAuthModal();
                 return false;
             }
+            isEnvVerified = true; // 验证成功后打上绿卡标记
             return true;
         }
         
@@ -284,6 +290,7 @@
             
             const userIP = await getIP();
             if (isIPInRange(userIP)) {
+                isEnvVerified = true; // 弹窗里验证成功也记为成功
                 statusBox.innerHTML = `✅ 认证成功！<br>当前校园网接入: ${userIP}`;
                 statusBox.className = "ip-tip ip-success";
                 if(!isLogin) {
@@ -358,7 +365,7 @@
                 let key = type === 'Market' ? 'store_m' : (type === 'Carpool' ? 'store_c' : 'store_j');
                 const imgUrls = [];
                 for(let f of localFiles[key]) {
-                    // 【修复】安全解决因为中文照片名或特殊符号导致截断无法上传的恶性 Bug
+                    // 核心修复3：强制将图片名转为英文字符时间戳，完美解决中文名空壳导致无法上传的Bug！
                     const ext = f.name.includes('.') ? f.name.split('.').pop() : 'png';
                     const fname = `public/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
                     await _supabase.storage.from('images').upload(fname, f);
@@ -496,7 +503,7 @@
             loadMessagesForCurrentRoom();
         }
 
-        // 【修复】微信级 UI，显式标注用户头像与名字，严格精准双向匹配过滤
+        // 微信级 UI，显式标注用户头像与名字
         async function loadMessagesForCurrentRoom() {
             if(!activeChatContext.postId) return;
             const { postId, receiverEmail } = activeChatContext;
@@ -528,7 +535,7 @@
                     const isMe = senderLower === myEmailLower;
                     
                     const avatarStr = msg.sender_email ? msg.sender_email.charAt(0).toUpperCase() : '?';
-                    const avatarBg = isMe ? '#10b981' : '#4f46e5'; // 我发的是绿色，对方是蓝色
+                    const avatarBg = isMe ? '#10b981' : '#4f46e5'; // 微信配色区分
                     const displayUserName = msg.sender_email ? msg.sender_email.split('@')[0] : '未知用户';
                     
                     return `
@@ -550,7 +557,7 @@
             chatBox.scrollTop = chatBox.scrollHeight; 
         }
 
-        // 发送消息防连点修复
+        // 发送消息防连点
         async function sendChatMessage() {
             const input = document.getElementById('chatMsgInput');
             const btn = document.getElementById('sendChatBtn');
@@ -616,7 +623,7 @@
             } else { alert("调试码错误"); }
         }
 
-        // 【修复】去掉了上传文件后重置input的代码，解决选图后依然显示“未选择”造成的迷惑
+        // 核心修复4：去掉了会导致视觉误判的清空代码
         function handleImgs(input, preId, key) {
             Array.from(input.files).forEach(f => {
                 localFiles[key].push(f);
@@ -627,7 +634,6 @@
                 div.onclick = () => { div.remove(); localFiles[key] = localFiles[key].filter(file => file !== f); };
                 document.getElementById(preId).appendChild(div);
             });
-            // 不再使用 input.value = ''; 防止视觉误导
         }
 
         async function checkSession() {
@@ -739,7 +745,6 @@
         function viewImage(url) { document.getElementById('viewedImg').src = url; document.getElementById('imgViewer').style.display = 'flex'; }
         
         function switchSection(id) {
-            // 切换板块时消除红点
             if (id === 'chats') document.getElementById('chatRedDot').style.display = 'none';
 
             if (id === 'mine' || id === 'chats') {
@@ -778,7 +783,6 @@
         window.onload = async () => { 
             await checkSession(); 
             const userIP = await getIP();
-            // 不自动阻断主页浏览
             await load(); 
         };
     </script>
