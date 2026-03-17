@@ -215,7 +215,7 @@
 
         let isEnvVerified = false; 
 
-        // --- 原封不动的IP验证防线 ---
+        // --- 剔除 112.224 IP 段 ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
             if (ip.includes(':')) {
@@ -225,7 +225,7 @@
             if(parts.length !== 4) return false;
             const p = parts.map(Number);
             if (p[0] === 210 && p[1] === 44 && (p[2] === 94 || p[2] === 95)) return true;
-            if (p[0] === 112 && (p[1] === 253 || p[1] === 224)) return true;
+            if (p[0] === 112 && p[1] === 253) return true; // 这里去掉了 112.224
             return false; 
         }
         
@@ -266,17 +266,15 @@
             } catch(e) { return false; }
         }
 
+        // --- 核心修改：移除缓存验证，每次操作强制实时检测网络环境 ---
         async function checkEnvironment() {
-            if (isEnvVerified) return true; 
-
             const userIP = await getIP();
             const isInRange = isIPInRange(userIP);
             if (!isInRange && !isAdmin) {
-                alert("⚠️ 接入环境异常：\n您当前正在使用外部网络（流量或外网WiFi）。\n根据校园安全要求，查看详情、发布与聊天功能必须在校园网环境下使用。");
+                alert("⚠️ 检测到您的网络环境已改变！\n请切换回校园网环境后，再重新尝试操作。");
                 openAuthModal();
                 return false;
             }
-            isEnvVerified = true; 
             return true;
         }
         
@@ -293,7 +291,6 @@
             
             const userIP = await getIP();
             if (isIPInRange(userIP)) {
-                isEnvVerified = true; 
                 statusBox.innerHTML = `✅ 认证成功！<br>当前校园网接入: ${userIP}`;
                 statusBox.className = "ip-tip ip-success";
                 if(!isLogin) {
@@ -429,7 +426,6 @@
             `}).join('');
         }
 
-        // --- 核心功能补充：获取商品缩略图与格式化时间 ---
         function getPostImageById(postId) {
             for(let type of ['Market', 'Carpool', 'Job']) {
                 let match = globalData[type].find(item => String(item.id) === String(postId));
@@ -448,7 +444,6 @@
             }
         }
 
-        // --- 渲染聊天列表：加入缩略图、最新时间与本地免后端的红点未读逻辑 ---
         async function renderChatList() {
             const container = document.getElementById('chatsListContainer');
             if(!isLogin || !currentUserEmail) {
@@ -497,10 +492,8 @@
                         };
                     }
                     
-                    // 基于本地缓存的已读时间来判断未读数量
                     const lastReadTime = localStorage.getItem('chat_read_' + threadKey) || 0;
                     const msgTime = new Date(msg.created_at).getTime();
-                    // 如果消息是发给我的，而且发送时间比我上次查看这个对话的时间晚，算作未读
                     if (msg.receiver_email.toLowerCase() === myEmailLower && msgTime > lastReadTime) {
                         chatThreads[threadKey].unreadCount++;
                         totalUnread++;
@@ -541,7 +534,6 @@
             
             activeChatContext = { postId: String(postId), postTitle, receiverEmail };
             
-            // 点击进入对话后，立即刷新本地时间戳，消除红点
             const threadKey = `${postId}_${receiverEmail.toLowerCase()}`;
             localStorage.setItem('chat_read_' + threadKey, Date.now());
 
@@ -551,7 +543,6 @@
 
             loadMessagesForCurrentRoom();
 
-            // 如果当前在消息列表界面，后台偷偷重刷一下列表把红点数字去掉
             if (document.getElementById('chatsSection').classList.contains('active')) {
                 renderChatList();
             }
@@ -629,7 +620,6 @@
                     content: text
                 }]);
                 
-                // 自己发送消息后，顺便更新本地阅读时间戳
                 const threadKey = `${activeChatContext.postId}_${activeChatContext.receiverEmail.toLowerCase()}`;
                 localStorage.setItem('chat_read_' + threadKey, Date.now());
 
@@ -658,7 +648,6 @@
                         const isCurrentRoom = String(msg.post_id) === String(activeChatContext.postId);
 
                         if (isChatRoomOpen && isCurrentRoom) {
-                            // 收到消息时，如果正好在这个聊天窗口里，自动把这条消息“已读”并更新时间
                             const threadKey = `${msg.post_id}_${senderLower}`;
                             localStorage.setItem('chat_read_' + threadKey, Date.now());
                             loadMessagesForCurrentRoom();
