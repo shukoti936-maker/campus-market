@@ -66,19 +66,20 @@
         .ip-fail { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
         .retry-link { color: #4f46e5; text-decoration: underline; cursor: pointer; margin-top: 5px; font-weight: bold; }
 
-        /* 聊天列表与对话框样式 */
-        .chat-thread-card { display: flex; background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; position: relative; align-items: center; gap: 12px; }
-        .chat-thread-card:hover { transform: translateY(-2px); transition: 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+        /* 聊天相关增强样式 - 增加缩略图与未读角标 */
+        .chat-thread-card { display: flex; align-items: center; gap: 12px; background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; border-left: 4px solid transparent; transition: 0.2s; }
+        .chat-thread-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+        .chat-thread-card.has-new { border-left-color: var(--primary); }
         .chat-thumb { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: #eee; flex-shrink: 0; }
         .chat-info { flex-grow: 1; overflow: hidden; }
         .chat-info h4 { margin-bottom: 5px; color: #333; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-info p { font-size: 13px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
-        .chat-meta { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; min-width: 60px; }
-        .chat-time { font-size: 11px; color: #999; margin-bottom: 5px; }
-        .unread-badge { background: var(--danger); color: white; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
+        .chat-info p { font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+        .chat-meta { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; min-width: 50px; gap: 5px; }
+        .chat-time { font-size: 11px; color: #999; }
+        .unread-badge { background: var(--danger); color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
         
         .chat-box { flex-grow: 1; background: #f3f4f6; border-radius: 8px; padding: 15px; overflow-y: auto; margin: 10px 0; display: flex; flex-direction: column; gap: 10px; min-height: 300px; max-height: 50vh; }
-        .msg-bubble { max-width: 75%; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-bubble { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
         .msg-left { background: white; color: #333; border: 1px solid #eee; border-top-left-radius: 2px; }
         .msg-right { background: #95ec69; color: #333; border-top-right-radius: 2px; }
         .msg-time { font-size: 10px; color: #aaa; text-align: center; margin: 5px 0; }
@@ -214,7 +215,7 @@
 
         let isEnvVerified = false; 
 
-        // --- IP检测保持完全原状 ---
+        // --- 原封不动的IP验证防线 ---
         function isIPInRange(ip) { 
             if(!ip || typeof ip !== 'string') return false; 
             if (ip.includes(':')) {
@@ -234,6 +235,7 @@
                 { url: 'https://api64.ipify.org?format=json', key: 'ip' },
                 { url: 'https://v4.ident.me/.json', key: 'address' }
             ];
+            
             for (let api of apis) {
                 try {
                     const controller = new AbortController();
@@ -258,6 +260,7 @@
                     postTime = new Date(today + " " + timeStr);
                 }
                 if (isNaN(postTime.getTime())) return false;
+                
                 const expireTime = postTime.getTime() + (24 * 60 * 60 * 1000);
                 return new Date().getTime() > expireTime;
             } catch(e) { return false; }
@@ -426,9 +429,8 @@
             `}).join('');
         }
 
-        // --- 核心优化：增加缩略图、最新时间、未读数量提取 ---
+        // --- 核心功能补充：获取商品缩略图与格式化时间 ---
         function getPostImageById(postId) {
-            // 在所有加载好的全局数据里找匹配的ID，返回第一张图片
             for(let type of ['Market', 'Carpool', 'Job']) {
                 let match = globalData[type].find(item => String(item.id) === String(postId));
                 if (match && match.images && match.images.length > 0) return match.images[0];
@@ -439,13 +441,14 @@
         function formatMsgTime(isoString) {
             const date = new Date(isoString);
             const today = new Date();
-            if (date.toDateString() === today.toLocaleDateString()) {
-                return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); // 今天只显示时间
+            if (date.toDateString() === today.toDateString()) {
+                return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             } else {
-                return `${date.getMonth()+1}/${date.getDate()}`; // 非今天显示日期
+                return `${date.getMonth()+1}/${date.getDate()}`;
             }
         }
 
+        // --- 渲染聊天列表：加入缩略图、最新时间与本地免后端的红点未读逻辑 ---
         async function renderChatList() {
             const container = document.getElementById('chatsListContainer');
             if(!isLogin || !currentUserEmail) {
@@ -470,13 +473,15 @@
 
                 if(!myMessages || myMessages.length === 0) {
                     container.innerHTML = `<div class="empty-state">📭 暂无对话记录。去浏览商品联系一下吧！</div>`;
+                    document.getElementById('chatRedDot').style.display = 'none';
                     return;
                 }
 
                 let chatThreads = {};
+                let totalUnread = 0;
+
                 myMessages.forEach(msg => {
                     const senderLower = msg.sender_email.toLowerCase();
-                    const receiverLower = msg.receiver_email.toLowerCase();
                     const otherPerson = senderLower === myEmailLower ? msg.receiver_email : msg.sender_email;
                     const threadKey = `${msg.post_id}_${otherPerson.toLowerCase()}`;
                     
@@ -486,26 +491,31 @@
                             postTitle: msg.post_title,
                             otherPerson: otherPerson,
                             lastMsg: msg.content,
-                            time: msg.created_at, // 保存完整时间排序用
-                            unreadCount: 0,
-                            thumb: getPostImageById(msg.post_id) // 获取缩略图
+                            time: msg.created_at,
+                            thumb: getPostImageById(msg.post_id),
+                            unreadCount: 0
                         };
                     }
                     
-                    // 统计未读（发给我的，且 is_read 为 false，如果后端没加这个字段默认为假不计或前端容错处理，这里通过时间标记简易红点）
-                    // 假设只要是发给我的，且在我们打开聊天框之前产生的都暂算未读逻辑，为了稳定起见，我们暂且把“最后一条是别人发给我的”算作有新动态。
-                    // 严谨做法：这里假设如果最新的消息是对方发的，就算有动态。
-                    if (chatThreads[threadKey].time === msg.created_at && senderLower !== myEmailLower) {
-                        chatThreads[threadKey].unreadCount = 1; 
+                    // 基于本地缓存的已读时间来判断未读数量
+                    const lastReadTime = localStorage.getItem('chat_read_' + threadKey) || 0;
+                    const msgTime = new Date(msg.created_at).getTime();
+                    // 如果消息是发给我的，而且发送时间比我上次查看这个对话的时间晚，算作未读
+                    if (msg.receiver_email.toLowerCase() === myEmailLower && msgTime > lastReadTime) {
+                        chatThreads[threadKey].unreadCount++;
+                        totalUnread++;
                     }
                 });
 
+                document.getElementById('chatRedDot').style.display = totalUnread > 0 ? 'block' : 'none';
+
                 container.innerHTML = Object.values(chatThreads).map(thread => {
                     const timeDisplay = formatMsgTime(thread.time);
-                    const unreadHtml = thread.unreadCount > 0 ? `<div class="unread-badge">新</div>` : '';
-                    
+                    const unreadHtml = thread.unreadCount > 0 ? `<div class="unread-badge">${thread.unreadCount}</div>` : '';
+                    const activeClass = thread.unreadCount > 0 ? 'has-new' : '';
+
                     return `
-                    <div class="chat-thread-card" onclick="openChatWindow('${thread.postId}', '${thread.postTitle}', '${thread.otherPerson}')">
+                    <div class="chat-thread-card ${activeClass}" onclick="openChatWindow('${thread.postId}', '${thread.postTitle}', '${thread.otherPerson}')">
                         <img src="${thread.thumb}" class="chat-thumb" onerror="this.src='${PLACEHOLDER}'">
                         <div class="chat-info">
                             <h4>关于：${thread.postTitle}</h4>
@@ -520,7 +530,7 @@
                 `}).join('');
 
             } catch(e) {
-                container.innerHTML = `<div class="empty-state">无法加载消息：${e.message}</div>`;
+                container.innerHTML = `<div class="empty-state">无法加载消息：${e.message}<br>请确保已在 Supabase 开启 Messages 表读取权限。</div>`;
             }
         }
 
@@ -531,11 +541,20 @@
             
             activeChatContext = { postId: String(postId), postTitle, receiverEmail };
             
+            // 点击进入对话后，立即刷新本地时间戳，消除红点
+            const threadKey = `${postId}_${receiverEmail.toLowerCase()}`;
+            localStorage.setItem('chat_read_' + threadKey, Date.now());
+
             document.getElementById('chatRoomTitle').innerText = `💬 与 ${receiverEmail.split('@')[0]} 的对话\n(关于: ${postTitle})`;
             document.getElementById('chatBoxContent').innerHTML = `<div class="empty-state">正在加载历史消息...</div>`;
             openModal('chatRoomModal', true);
 
             loadMessagesForCurrentRoom();
+
+            // 如果当前在消息列表界面，后台偷偷重刷一下列表把红点数字去掉
+            if (document.getElementById('chatsSection').classList.contains('active')) {
+                renderChatList();
+            }
         }
 
         async function loadMessagesForCurrentRoom() {
@@ -589,9 +608,6 @@
                 }).join('');
             }
             chatBox.scrollTop = chatBox.scrollHeight; 
-            
-            // 看完后清除导航栏红点
-            document.getElementById('chatRedDot').style.display = 'none';
         }
 
         async function sendChatMessage() {
@@ -612,6 +628,11 @@
                     receiver_email: activeChatContext.receiverEmail,
                     content: text
                 }]);
+                
+                // 自己发送消息后，顺便更新本地阅读时间戳
+                const threadKey = `${activeChatContext.postId}_${activeChatContext.receiverEmail.toLowerCase()}`;
+                localStorage.setItem('chat_read_' + threadKey, Date.now());
+
                 loadMessagesForCurrentRoom();
             } catch(e) { 
                 alert("发送失败!"); 
@@ -637,10 +658,12 @@
                         const isCurrentRoom = String(msg.post_id) === String(activeChatContext.postId);
 
                         if (isChatRoomOpen && isCurrentRoom) {
+                            // 收到消息时，如果正好在这个聊天窗口里，自动把这条消息“已读”并更新时间
+                            const threadKey = `${msg.post_id}_${senderLower}`;
+                            localStorage.setItem('chat_read_' + threadKey, Date.now());
                             loadMessagesForCurrentRoom();
                         } else if (isChatsTabActive) {
                             renderChatList(); 
-                            if (receiverLower === myEmailLower) document.getElementById('chatRedDot').style.display = 'block';
                         } else {
                             if (receiverLower === myEmailLower) document.getElementById('chatRedDot').style.display = 'block';
                         }
@@ -798,7 +821,6 @@
                 if (targetId === 'mine') renderMine();
                 if (targetId === 'chats') {
                     renderChatList();
-                    document.getElementById('chatRedDot').style.display = 'none'; // 点进消息板块就消红点
                 }
             }
         }
